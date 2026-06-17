@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../learn/grammar/grammar_screen.dart';
+import '../learn/flashcards/flashcards_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -124,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             // 2. Селектор Уровня и Индикатор прогресса
             _buildLevelAndProgressSelector(),
 
-            // 3. Кастомное меню вкладок (Главная, Карточки...)
+            // 3. Кастомное меню вкладок
             _buildSubTabBar(),
 
             // Контент страниц со свайпом
@@ -132,11 +133,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildMainTabContent(),
-                  const Center(child: Text('Экран карточек (В разработке)')),
-                  const GrammarScreen(),
-                  const Center(child: Text('Экран слушания (В разработке)')),
-                  const Center(child: Text('Экран чтения (В разработке)')),
+                  _buildMainTabContent(),                              // 1: Главная
+                  FlashcardsTab(currentLevel: _currentLevel),          // 2: Карточки
+                  const GrammarScreen(),                               // 3: Грамматика
+                  const Center(child: Text('Экран слушания (В разработке)')), // 4: Слушание
+                  const Center(child: Text('Экран чтения (В разработке)')),   // 5: Чтение
                 ],
               ),
             ),
@@ -177,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
           Text(
             '$streak',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins'),
           ),
 
           const SizedBox(width:4),
@@ -337,7 +338,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Чисто белый бейдж без прозрачности, текст фиолетовый primary
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -354,7 +354,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
-              // Белая иконка громкости
               const Icon(
                 Icons.volume_up_rounded,
                 color: Colors.white,
@@ -363,7 +362,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
           const SizedBox(height: 16),
-          // Немецкое слово
           Text(
             word,
             style: const TextStyle(
@@ -375,7 +373,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           if (transcription.isNotEmpty) ...[
             const SizedBox(height: 2),
-            // Транскрипция белым цветом с легкой прозрачностью
             Text(
               transcription,
               style: TextStyle(
@@ -388,7 +385,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ],
           const SizedBox(height: 12),
-          // Русский перевод
           Text(
             translation,
             style: const TextStyle(
@@ -399,7 +395,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(height: 4),
-          // Объяснение / Пример предложения
           Text(
             explanation,
             style: TextStyle(
