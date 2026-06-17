@@ -148,50 +148,55 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildTopHeader() {
     final streak = _profile?['streak_days'] ?? 0;
     final avatarUrl = _profile?['avatar_url'];
-    final firstName = _profile?['first_name'] ?? 'Пользователь';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 16,
+      ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 22,
-            backgroundColor: AppColors.surfaceVariant,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-            child: avatarUrl == null
-                ? const Icon(Icons.person, color: AppColors.textSecondary, size: 22)
+            radius: 30,
+            backgroundColor: const Color(0xFFF2F2F2),
+            backgroundImage:
+            avatarUrl != null && avatarUrl.isNotEmpty
+                ? NetworkImage(avatarUrl)
+                : null,
+            child: avatarUrl == null || avatarUrl.isEmpty
+                ? const Icon(
+              Icons.person_outline,
+              size: 32,
+              color: Color(0xFFAAAAAA),
+            )
                 : null,
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Привет,', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500, fontFamily: 'Nunito')),
-              Text(firstName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Nunito')),
-            ],
-          ),
+
           const Spacer(),
-          // Стрик дней в стиле скругленной капсулы из дизайна
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.orangeLight.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Row(
-              children: [
-                const Text('🔥', style: TextStyle(fontSize: 15)),
-                const SizedBox(width: 4),
-                Text('$streak дней', style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, fontSize: 13, fontFamily: 'Nunito')),
-              ],
-            ),
+
+          Text(
+            '$streak',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins'),
           ),
-          const SizedBox(width: 6),
+
+          const SizedBox(width:4),
+
+          const Icon(
+            Icons.local_fire_department_outlined,
+            size: 26,
+            color: Color(0xFFFF7B33),
+          ),
+
+          const SizedBox(width: 2),
+
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary, size: 24),
             onPressed: () {},
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+            splashRadius: 20,
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              size: 26,
+              color: Color(0xFF7643EE),
+            ),
           ),
         ],
       ),
@@ -206,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         children: [
           Row(
             children: [
-              const Text('Мой уровень: ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Nunito')),
+              const Text('Мой уровень: ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins')),
               PopupMenuButton<String>(
                 initialValue: _currentLevel,
                 onSelected: _updateLevel,
@@ -214,13 +219,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: Row(
                   children: [
-                    Text(_currentLevel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary, fontFamily: 'Nunito')),
+                    Text(_currentLevel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary, fontFamily: 'Poppins')),
                     const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary, size: 20),
                   ],
                 ),
                 itemBuilder: (context) => _levels.map((lvl) => PopupMenuItem<String>(
                   value: lvl,
-                  child: Text(lvl, style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Nunito')),
+                  child: Text(lvl, style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                 )).toList(),
               ),
             ],
@@ -232,15 +237,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               value: 0.35,
               minHeight: 7,
               backgroundColor: AppColors.surfaceVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
             ),
           ),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Прогресс этапа', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Nunito')),
-              Text('35%', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Nunito')),
+              const Text('Прогресс этапа', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
             ],
           ),
         ],
@@ -248,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Полностью переработанный таббар, соответствующий вашему чистому UI
+
   Widget _buildSubTabBar() {
     return Container(
       height: 40,
@@ -269,11 +273,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             borderRadius: BorderRadius.circular(20),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          dividerColor: Colors.transparent, // Убираем дефолтную серую линию Material 3
+          dividerColor: Colors.transparent,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Nunito'),
-          unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Nunito'),
+          labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
+          unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
           tabs: _subTabs.map((tabName) => Tab(text: tabName)).toList(),
         ),
       ),
@@ -300,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _buildMenuBlock(
           title: 'Интересные Статьи',
           subtitle: 'Погружайся в культуру и чтение',
-          color: AppColors.accent,
+          color: AppColors.accentLight,
           isDarkTheme: false,
           imageAsset: 'assets/images/home/home_im2.png',
           onTap: () => context.push(Routes.home),
@@ -323,9 +327,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: const Color(0xFFBAA1F6),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,27 +336,78 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Чисто белый бейдж без прозрачности, текст фиолетовый primary
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12)
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text('Слово дня', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700, fontFamily: 'Nunito')),
+                child: const Text(
+                  'Слово дня',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
               ),
-              const Icon(Icons.volume_up_rounded, color: AppColors.primary, size: 22),
+              // Белая иконка громкости
+              const Icon(
+                Icons.volume_up_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(word, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Nunito')),
+          const SizedBox(height: 16),
+          // Немецкое слово
+          Text(
+            word,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontFamily: 'Poppins',
+            ),
+          ),
           if (transcription.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(transcription, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500, fontFamily: 'Nunito')),
+            // Транскрипция белым цветом с легкой прозрачностью
+            Text(
+              transcription,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.8),
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Poppins',
+              ),
+            ),
           ],
-          const Divider(height: 20, thickness: 1, color: AppColors.border),
-          Text(translation, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Nunito')),
+          const SizedBox(height: 12),
+          // Русский перевод
+          Text(
+            translation,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontFamily: 'Poppins',
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(explanation, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.3, fontFamily: 'Nunito')),
+          // Объяснение / Пример предложения
+          Text(
+            explanation,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withOpacity(0.9),
+              height: 1.3,
+              fontFamily: 'Poppins',
+            ),
+          ),
         ],
       ),
     );
@@ -387,11 +441,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Nunito')),
+                  Text(title, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
                   const SizedBox(height: 4),
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.5,
-                    child: Text(subtitle, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Nunito', height: 1.2)),
+                    child: Text(subtitle, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins', height: 1.2)),
                   ),
                 ],
               ),
@@ -425,7 +479,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Вы изучали в последний раз', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Nunito')),
+          const Text('Вы изучали в последний раз', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -439,9 +493,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Грамматика: Passiv', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Nunito')),
+                    const Text('Грамматика: Passiv', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                     const SizedBox(height: 2),
-                    Text('Урок 3 из 10 • Уровень $_currentLevel', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Nunito')),
+                    Text('Урок 3 из 10 • Уровень $_currentLevel', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
                   ],
                 ),
               ),
