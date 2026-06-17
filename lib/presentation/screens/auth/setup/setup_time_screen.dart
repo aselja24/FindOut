@@ -11,43 +11,33 @@ class SetupTimeScreen extends StatefulWidget {
 }
 
 class _SetupTimeScreenState extends State<SetupTimeScreen> {
-  String? _selected;
+  String? _selectedTime;
   bool _isUpdating = false;
 
   final List<Map<String, String>> _times = [
-    {'label': '5 мин/день', 'icon': '⚡'},
-    {'label': '15 мин/день', 'icon': '🕐'},
-    {'label': '30 мин/день', 'icon': '🕑'},
-    {'label': '60 мин/день', 'icon': '🔥'},
+    {'label': '5 минут', 'value': '5'},
+    {'label': '10 минут', 'value': '10'},
+    {'label': '15 минут', 'value': '15'},
+    {'label': '20 минут', 'value': '20'},
   ];
 
-  Future<void> _completeSetup() async {
-    if (_selected == null) return;
+  Future<void> _saveTime() async {
     setState(() => _isUpdating = true);
-
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId != null) {
-        // ИСПРАВЛЕНО: Меняем на 'daily_time_target' строго под твою структуру таблицы profiles
         await Supabase.instance.client
             .from('profiles')
-            .update({'daily_time_target': _selected})
+            .update({'daily_time_target': _selectedTime})
             .eq('id', userId);
       }
-
-      if (mounted) {
-        context.go(Routes.home);
-      }
+      if (mounted) context.go(Routes.home);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Не удалось завершить настройку: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isUpdating = false);
-      }
+      if (mounted) setState(() => _isUpdating = false);
     }
   }
 
@@ -55,90 +45,42 @@ class _SetupTimeScreenState extends State<SetupTimeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black),
-          onPressed: _isUpdating ? null : () => context.pop(),
-        ),
-        title: const Text('Выполнено 4/4',
-            style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600)),
-      ),
-      body: SafeArea(
+      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, centerTitle: true, title: const Text('Выполнено 4/4', style: TextStyle(color: Colors.black))),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
+            const Text('Сколько времени в день ты готов уделять?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 32),
-            const Text('Сколько времени в день?',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.black)),
-            const SizedBox(height: 32),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                itemCount: _times.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (ctx, i) {
-                  final time = _times[i];
-                  final isSelected = _selected == time['label'];
-                  return GestureDetector(
-                    onTap: _isUpdating ? null : () => setState(() => _selected = time['label']),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : const Color(0xFFF2F2F2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : Colors.transparent,
-                          width: 2,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44, height: 44,
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary : const Color(0xFFD9D9D9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(time['icon']!, style: const TextStyle(fontSize: 20)),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(time['label']!,
-                              style: TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.w700,
-                                color: isSelected ? AppColors.primary : Colors.black,
-                              )),
-                        ],
-                      ),
+            ..._times.map((t) {
+              final isSelected = _selectedTime == t['value'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedTime = t['value']),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary.withOpacity(0.1) : const Color(0xFFF2F2F2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent, width: 2),
                     ),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: SizedBox(
-                width: double.infinity, height: 58,
-                child: ElevatedButton(
-                  onPressed: _selected == null || _isUpdating ? null : _completeSetup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    child: Center(child: Text(t['label']!, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? AppColors.primary : Colors.black))),
                   ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                    height: 24, width: 24,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                  )
-                      : const Text('Начать обучение', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 ),
+              );
+            }),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity, height: 58,
+              child: ElevatedButton(
+                onPressed: _selectedTime == null || _isUpdating ? null : _saveTime,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                child: _isUpdating ? const CircularProgressIndicator(color: Colors.white) : const Text('Начать обучение'),
               ),
             ),
           ],

@@ -57,7 +57,7 @@ class _GoalSelectScreenState extends State<GoalSelectScreen> {
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : const Color(0xFFF2F2F2),
+                        color: isSelected ? AppColors.primary.withOpacity(0.08) : const Color(0xFFF2F2F2),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: isSelected ? AppColors.primary : Colors.transparent,
@@ -95,7 +95,7 @@ class _GoalSelectScreenState extends State<GoalSelectScreen> {
                   onPressed: _selected == null ? null : () => context.push(Routes.setupLevel),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4),
+                    disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
