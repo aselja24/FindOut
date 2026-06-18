@@ -84,7 +84,9 @@ class GrammarDetailScreen extends StatelessWidget {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  // Логика перехода к тесту
+                  // Достаем id урока (убедись, что ключ совпадает с тем, как он приходит из БД)
+                  final int lessonId = lesson['id'] as int;
+                  context.push('/grammar/test', extra: lessonId);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

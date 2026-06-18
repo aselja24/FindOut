@@ -17,6 +17,7 @@ import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/main_wrapper.dart';
 import '../../presentation/screens/learn/grammar/grammar_detail_screen.dart';
 import '../constants/route_constants.dart';
+import '../../presentation/screens/learn/grammar/grammar_test_screen.dart';
 
 class AppRouter {
   static final _rootKey = GlobalKey<NavigatorState>();
@@ -61,6 +62,15 @@ class AppRouter {
         builder: (context, state) {
           final lesson = state.extra as Map<String, dynamic>;
           return GrammarDetailScreen(lesson: lesson);
+        },
+      ),
+
+      // Страница теста (исправлен синтаксис)
+      GoRoute(
+        path: '/grammar/test',
+        builder: (context, state) {
+          final lessonId = state.extra as int;
+          return GrammarTestScreen(lessonId: lessonId);
         },
       ),
 
