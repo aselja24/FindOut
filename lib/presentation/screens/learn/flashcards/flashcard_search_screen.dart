@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../widgets/common/colored_module_card.dart';
 import 'flashcards_screen.dart';
 import 'create_edit_module_screen.dart';
+import 'flashcard_study_screen.dart';
 
 class FlashcardSearchScreen extends StatefulWidget {
   const FlashcardSearchScreen({super.key});
@@ -258,12 +259,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => FlashcardsScreen(
-                    moduleId: module['id'],
-                    title: module['title'],
-                    color: module['color'],
-                    isOwned: isOwned,
-                  ),
+                  builder: (_) => FlashcardStudyScreen(moduleId: module['id']),
                 ),
               );
             }),

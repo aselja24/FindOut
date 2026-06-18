@@ -5,6 +5,8 @@ import '../../../../../../core/theme/app_colors.dart';
 import '../flashcards/flashcard_search_screen.dart';
 import '../flashcards/flashcards_screen.dart';
 import '../flashcards/create_edit_module_screen.dart';
+import 'flashcard_study_screen.dart';
+import 'folder_view_screen.dart';
 
 class FlashcardsTab extends StatefulWidget {
   final String currentLevel;
@@ -79,7 +81,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     });
   }
 
-  // === ПРИВЯЗКА К SUPABASE С УЧЕТОМ ЦВЕТА ===
+  // === ПРИВЯЗКА К SUPABASE ===
   Future<void> _fetchData() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -131,8 +133,23 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
         _startCarouselTimer(activeItemsCount);
       }
     } catch (e) {
-      debugPrint('Ошибка загрузки карточек: $e');
+      debugPrint('Ошибка загрузки данных: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _createNewFolder(String name) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await Supabase.instance.client.from('flashcard_folders').insert({
+        'user_id': userId,
+        'name': name.trim(),
+      });
+      _fetchData(); // Обновляем список после создания
+    } catch (e) {
+      debugPrint('Ошибка создания папки: $e');
     }
   }
 
@@ -194,15 +211,11 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                             height: 38,
                             child: ElevatedButton(
                               onPressed: () {
-                                // ПЕРЕХОД 1: Из Карусели
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => FlashcardsScreen(
+                                    builder: (_) => FlashcardStudyScreen(
                                       moduleId: item['id'],
-                                      title: item['title'],
-                                      color: item['color'],
-                                      isOwned: true,
                                     ),
                                   ),
                                 );
@@ -354,7 +367,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
       itemBuilder: (ctx, i) {
         final item = items[i];
         return GestureDetector(
-          // ПЕРЕХОД 2: Из сетки Недавние
           onTap: () {
             Navigator.push(
               context,
@@ -492,7 +504,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                   : 'Папка • Автор: Вы';
 
               return GestureDetector(
-                // ПЕРЕХОД 3: Из Библиотеки (только если это модуль, а не папка)
                 onTap: () {
                   if (isMod) {
                     final item = filteredModules[idx];
@@ -508,7 +519,16 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                       ),
                     );
                   } else {
-                    // TODO: Логика перехода в папку
+                    final folderItem = _folders[idx];
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FolderViewScreen(
+                          folderId: folderItem['id'],
+                          initialFolderName: folderItem['name'],
+                        ),
+                      ),
+                    ).then((_) => _fetchData()); // Обновляем библиотеку при возврате
                   }
                 },
                 child: Container(
@@ -594,6 +614,35 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     );
   }
 
+  void _showCreateFolderDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Новая папка', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Название папки', focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary))),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена', style: TextStyle(color: AppColors.textSecondary))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                Navigator.pop(ctx);
+                _createNewFolder(ctrl.text);
+              }
+            },
+            child: const Text('Создать', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCreateBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -607,22 +656,21 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 24),
             _buildCreateOptionRow('Модуль', FlashcardIconPainter(color: AppColors.primary), () {
-              Navigator.pop(ctx); // Закрываем нижнее меню
-
-              // ПЕРЕХОД: Открываем экран создания с нуля (передаем пустые данные)
-              // Убедись, что импорт 'create_edit_module_screen.dart' добавлен вверху файла
+              Navigator.pop(ctx);
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CreateEditModuleScreen(), // Без moduleId = режим создания
+                  builder: (_) => const CreateEditModuleScreen(),
                 ),
               ).then((created) {
-                // Если пользователь нажал галочку "сохранить", обновляем список
                 if (created == true) _fetchData();
               });
             }),
             const SizedBox(height: 14),
-            _buildCreateOptionRow('Папка', FolderIconPainter(color: AppColors.primary), () => Navigator.pop(ctx)),
+            _buildCreateOptionRow('Папка', FolderIconPainter(color: AppColors.primary), () {
+              Navigator.pop(ctx);
+              _showCreateFolderDialog();
+            }),
           ],
         ),
       ),
