@@ -16,21 +16,17 @@ class GrammarTestScreen extends StatefulWidget {
 
 class _GrammarTestScreenState extends State<GrammarTestScreen> {
   List<dynamic> _questions = [];
-  List<dynamic> _wrongAnswers = [];
+  List<Map<String, dynamic>> _wrongAnswers = [];
 
   TestState _currentState = TestState.loading;
   int _currentIndex = 0;
   int? _selectedOptionIndex;
   int _correctAnswersCount = 0;
 
-  // Цвета из макетов
-  final Color _purple = const Color(0xFF7B4DFE);
-  final Color _orange = const Color(0xFFFF9D66);
-  final Color _green = const Color(0xFFC3F336);
-  final Color _pink = const Color(0xFFFF9DE6);
-  final Color _darkText = const Color(0xFF2D2D2D);
-  final Color _red = const Color(0xFFE86B43);
-  final Color _bgGray = const Color(0xFFF8F9FA);
+  final Color _purple = AppColors.primary;
+  final Color _orange = AppColors.orange;
+  final Color _green = AppColors.accent;
+  final Color _pink = AppColors.pinkLight;
 
   @override
   void initState() {
@@ -48,7 +44,8 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
 
       setState(() {
         _questions = response;
-        _currentState = _questions.isEmpty ? TestState.result : TestState.playing;
+        _currentState =
+        _questions.isEmpty ? TestState.result : TestState.playing;
       });
     } catch (e) {
       if (mounted) {
@@ -59,7 +56,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     }
   }
 
-  // Сохранение прогресса в БД
   Future<void> _saveProgressToDB() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
@@ -76,7 +72,9 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     }
   }
 
-  void _recordAnswer() {
+  void _checkAnswer() {
+    if (_selectedOptionIndex == null) return;
+
     final question = _questions[_currentIndex];
     final correctIndex = question['correct_index'] as int;
 
@@ -88,23 +86,13 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
         'selected_index': _selectedOptionIndex,
       });
     }
-  }
 
-  void _checkAnswer() {
-    if (_selectedOptionIndex == null) return;
-    _recordAnswer();
     setState(() {
       _currentState = TestState.checking;
     });
   }
 
   void _nextQuestion() async {
-    // Если мы не проверяли ответ кнопкой "Проверить", то тихо сохраняем его сейчас
-    if (_currentState == TestState.playing) {
-      if (_selectedOptionIndex == null) return;
-      _recordAnswer();
-    }
-
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
@@ -112,7 +100,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
         _currentState = TestState.playing;
       });
     } else {
-      // Сохраняем в базу перед показом результатов
       await _saveProgressToDB();
       setState(() {
         _currentState = TestState.result;
@@ -122,60 +109,82 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_currentState == TestState.loading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopMockupHeader(),
-            Expanded(
-              child: _buildBody(),
-            ),
+            _buildTopHeader(),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
     );
   }
 
-  // ==========================================
-  // ВЕРХНИЙ КОЛОНТИТУЛ (Как на макете)
-  // ==========================================
-  Widget _buildTopMockupHeader() {
+  // ─── TOP HEADER (общий для всех состояний) ───────────────────────────────
+  Widget _buildTopHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              CircleAvatar(backgroundColor: _purple, radius: 20, child: const Icon(Icons.person, color: Colors.white)),
-              Row(
-                children: [
-                  const Text('0 ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const Icon(Icons.local_fire_department_outlined, color: Colors.orange),
-                  const SizedBox(width: 16),
-                  Icon(Icons.notifications_none, color: _purple),
-                ],
-              )
+              const Text(
+                '0 ',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const Icon(Icons.local_fire_department_outlined,
+                  color: Colors.orange),
+              const SizedBox(width: 16),
+              Icon(Icons.notifications_none, color: _purple),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          const Row(
             children: [
-              const Text('Начинающий - А1', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              const Icon(Icons.keyboard_arrow_down, size: 20),
+              Text(
+                'Начинающий - А1',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_down, size: 20),
             ],
           ),
           const SizedBox(height: 8),
           Stack(
             children: [
-              Container(height: 6, decoration: BoxDecoration(color: const Color(0xFFEEEEEE), borderRadius: BorderRadius.circular(3))),
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
               LayoutBuilder(
                 builder: (context, constraints) => Container(
                   width: constraints.maxWidth * 0.2,
                   height: 6,
-                  decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(3)),
+                  decoration: BoxDecoration(
+                    color: _green,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
               ),
             ],
@@ -184,9 +193,20 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(20)),
-              child: const Text('А1-начинающий', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: _green,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'А1-начинающий',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
             ),
           ),
         ],
@@ -194,10 +214,9 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     );
   }
 
+  // ─── BODY ROUTER ─────────────────────────────────────────────────────────
   Widget _buildBody() {
     switch (_currentState) {
-      case TestState.loading:
-        return Center(child: CircularProgressIndicator(color: _purple));
       case TestState.playing:
       case TestState.checking:
         return _buildTestContent();
@@ -205,339 +224,663 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
         return _buildResultContent();
       case TestState.review:
         return _buildReviewContent();
+      default:
+        return const SizedBox();
     }
   }
 
-  // ==========================================
-  // 1. ЭКРАН ТЕСТА (Вопрос и Проверка)
-  // ==========================================
+  // ─── TEST CONTENT (playing + checking) ───────────────────────────────────
   Widget _buildTestContent() {
     final question = _questions[_currentIndex];
     final options = List<String>.from(question['options']);
     final correctIndex = question['correct_index'] as int;
     final isChecking = _currentState == TestState.checking;
+    final hasSelected = _selectedOptionIndex != null;
     final isLastQuestion = _currentIndex == _questions.length - 1;
+    final isWrong = isChecking &&
+        _selectedOptionIndex != null &&
+        _selectedOptionIndex != correctIndex;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ТЕСТ', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: _darkText)),
-          Container(height: 4, width: double.infinity, color: _purple, margin: const EdgeInsets.only(top: 8, bottom: 24)),
-
+          // Заголовок ТЕСТ
           const Text(
-            'Личные местоимения и глаголы в настоящем времени',
-            style: TextStyle(fontSize: 16, color: Color(0xFF555555)),
+            'ТЕСТ',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+            ),
           ),
-          const SizedBox(height: 32),
+          Container(
+            height: 4,
+            width: double.infinity,
+            color: _purple,
+            margin: const EdgeInsets.only(top: 8, bottom: 16),
+          ),
+
+          // Тема урока
+          if (question['lesson_title'] != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                question['lesson_title'],
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 8),
 
           // Карточка с вопросом
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 4)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Номер и заголовок вопроса
                     Text(
                       '${_currentIndex + 1}. Выбери правильный вариант',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _darkText),
-                    ),
-                    if (isChecking && _selectedOptionIndex != correctIndex)
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: _red, shape: BoxShape.circle),
-                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
                       ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Текст вопроса
+                    Text(
+                      question['question'],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: 'Poppins',
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Варианты ответов — кнопки-пилюли
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: List.generate(options.length, (index) {
+                        final isSelected = _selectedOptionIndex == index;
+                        final isCorrect = correctIndex == index;
+
+                        Color bgColor = _purple;
+                        Color textColor = Colors.white;
+                        double opacity = 1.0;
+
+                        if (isChecking) {
+                          if (isCorrect) {
+                            // Правильный — остаётся фиолетовым (выделен)
+                            bgColor = _purple;
+                            opacity = 1.0;
+                          } else if (isSelected) {
+                            // Неправильный выбранный — затемнённый
+                            bgColor = _purple;
+                            opacity = 0.4;
+                          } else {
+                            // Остальные — тусклые
+                            bgColor = _purple;
+                            opacity = 0.4;
+                          }
+                        } else {
+                          // Режим выбора
+                          if (isSelected) {
+                            bgColor = _purple;
+                            opacity = 1.0;
+                          } else {
+                            bgColor = _purple;
+                            opacity = 0.4;
+                          }
+                        }
+
+                        return GestureDetector(
+                          onTap: isChecking
+                              ? null
+                              : () => setState(
+                                  () => _selectedOptionIndex = index),
+                          child: Opacity(
+                            opacity: opacity,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: bgColor,
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Text(
+                                options[index],
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                Text(question['question'], style: TextStyle(fontSize: 16, color: _darkText, height: 1.5)),
-                const SizedBox(height: 24),
 
-                // Варианты ответов (Pills)
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: List.generate(options.length, (index) {
-                    final isSelected = _selectedOptionIndex == index;
-                    return GestureDetector(
-                      onTap: isChecking ? null : () => setState(() => _selectedOptionIndex = index),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? _purple : _purple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          options[index],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : _purple,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
+                // Красный крест при неправильном ответе
+                if (isWrong)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _orange,
+                        shape: BoxShape.circle,
                       ),
-                    );
-                  }),
-                ),
+                      child: const Icon(Icons.close,
+                          color: Colors.white, size: 18),
+                    ),
+                  ),
               ],
             ),
           ),
 
+          // Блок "Правильный ответ + Объяснение" (только при checking)
           if (isChecking) ...[
-            const SizedBox(height: 24),
-            Text.rich(
-              TextSpan(
-                text: 'Правильный ответ: ',
-                style: const TextStyle(fontSize: 15, color: Color(0xFF555555)),
+            const SizedBox(height: 16),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                  color: Colors.black87,
+                ),
                 children: [
-                  TextSpan(text: options[correctIndex], style: TextStyle(color: _purple, fontWeight: FontWeight.w700)),
+                  const TextSpan(text: 'Правильный ответ: '),
+                  TextSpan(
+                    text: options[correctIndex],
+                    style: TextStyle(
+                      color: _purple,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text('Объяснение', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _darkText)),
-            const SizedBox(height: 8),
-            Text(
-              question['explanation'] ?? '',
-              style: const TextStyle(fontSize: 15, color: Color(0xFF555555), height: 1.5),
-            ),
-          ],
-
-          const SizedBox(height: 40),
-
-          // Кнопки управления внизу
-          // Кнопки управления внизу
-          Row(
-            mainAxisAlignment: isChecking ? MainAxisAlignment.end : MainAxisAlignment.spaceBetween,
-            children: [
-              if (!isChecking)
-                SizedBox(
-                  width: 140,
-                  child: _CustomButton(
-                    text: 'Проверить',
-                    color: _orange,
-                    textColor: Colors.black,
-                    onPressed: _selectedOptionIndex != null ? _checkAnswer : null,
-                  ),
+            if (question['explanation'] != null) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Объяснение',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
                 ),
-              SizedBox(
-                width: isLastQuestion ? 180 : 140,
-                child: _CustomButton(
-                  text: isLastQuestion ? 'Завершить тест' : 'Дальше',
-                  color: isLastQuestion ? _purple : _green,
-                  textColor: isLastQuestion ? Colors.white : Colors.black,
-                  // Кнопка активна, если выбран ответ или если мы уже находимся в режиме проверки
-                  onPressed: (_selectedOptionIndex != null || isChecking) ? _nextQuestion : null,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                question['explanation'],
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  fontFamily: 'Poppins',
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 20),
+            // Кнопка "Дальше" — только справа
+            Align(
+              alignment: Alignment.centerRight,
+              child: _PillButton(
+                text: isLastQuestion ? 'Завершить' : 'Дальше',
+                color: _green,
+                textColor: Colors.black,
+                onPressed: _nextQuestion,
+              ),
+            ),
+          ],
+
+          // Кнопки нижнего ряда (только в режиме playing)
+          if (!isChecking) ...[
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                // Проверить — всегда слева
+                _PillButton(
+                  text: 'Проверить',
+                  color: _orange,
+                  textColor: Colors.black,
+                  onPressed: hasSelected ? _checkAnswer : null,
+                ),
+                const Spacer(),
+                // Последний вопрос — "Завершить тест", иначе "Дальше"
+                _PillButton(
+                  text: isLastQuestion ? 'Завершить тест' : 'Дальше',
+                  color: _green,
+                  textColor: Colors.black,
+                  onPressed: hasSelected ? _nextQuestion : null,
+                ),
+              ],
+            ),
+          ],
+
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  // ==========================================
-  // 2. ЭКРАН РЕЗУЛЬТАТОВ
-  // ==========================================
+  // ─── RESULT ──────────────────────────────────────────────────────────────
   Widget _buildResultContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ты молодец!', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: _darkText)),
-          Container(height: 4, width: double.infinity, color: _purple, margin: const EdgeInsets.only(top: 8, bottom: 40)),
+          const Text(
+            'Ты молодец!',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          Container(
+            height: 4,
+            width: double.infinity,
+            color: _purple,
+            margin: const EdgeInsets.only(top: 8, bottom: 32),
+          ),
 
-          Center(
+          Expanded(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Имитация картинки из макета
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
-                  child: const Text('А ты крут ;)', style: TextStyle(fontSize: 14)),
+                // Персонаж + речевой пузырь
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Center(
+                      child: Image.asset(
+                        'assets/images/grammer/result_character.png',
+                        height: 220,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/images/onboarding/onb3.png',
+                          height: 220,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: const Text(
+                          'А ты крут ;)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                const Icon(Icons.emoji_events_outlined, size: 120, color: Colors.amber), // Заглушка вместо иллюстрации
                 const SizedBox(height: 32),
-
                 Text(
                   '$_correctAnswersCount из ${_questions.length} правильных ответов',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: _darkText),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Poppins',
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
 
-          const Spacer(),
-          Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: 140,
-              child: _CustomButton(
-                text: 'Далее',
-                color: _orange,
-                textColor: Colors.black,
-                onPressed: () => context.pop(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          Row(
+          // Кнопки
+          Column(
             children: [
-              Expanded(
-                child: _CustomButton(
-                  text: 'Вернуться к правилу',
-                  color: _pink,
+              // Далее — справа
+              Align(
+                alignment: Alignment.centerRight,
+                child: _PillButton(
+                  text: 'Далее',
+                  color: _orange,
                   textColor: Colors.black,
                   onPressed: () => context.pop(),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _CustomButton(
-                  text: 'Разбор ошибок',
-                  color: _green,
-                  textColor: Colors.black,
-                  onPressed: () {
-                    if (_wrongAnswers.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('У тебя нет ошибок!')));
-                    } else {
-                      setState(() => _currentState = TestState.review);
-                    }
-                  },
-                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PillButton(
+                      text: 'Вернуться к правилу',
+                      color: _pink,
+                      textColor: Colors.black,
+                      onPressed: () => context.pop(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _PillButton(
+                      text: 'Разбор ошибок',
+                      color: _green,
+                      textColor: Colors.black,
+                      onPressed: _wrongAnswers.isEmpty
+                          ? null
+                          : () => setState(
+                              () => _currentState = TestState.review),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  // ==========================================
-  // 3. ЭКРАН РАЗБОРА ОШИБОК
-  // ==========================================
+  // ─── REVIEW ──────────────────────────────────────────────────────────────
   Widget _buildReviewContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Заголовок
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Давай разберем ошибки!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: _darkText)),
-              Container(height: 4, width: double.infinity, color: _purple, margin: const EdgeInsets.only(top: 8, bottom: 24)),
+              const Text(
+                'Давай разберем ошибки!',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black87,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Container(
+                height: 4,
+                width: double.infinity,
+                color: _purple,
+                margin: const EdgeInsets.only(top: 8, bottom: 8),
+              ),
             ],
           ),
         ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            itemCount: _wrongAnswers.length,
-            separatorBuilder: (_, __) => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Divider(color: Color(0xFFEEEEEE), thickness: 1),
-            ),
-            itemBuilder: (context, index) {
-              final item = _wrongAnswers[index];
-              final q = item['question'];
-              final options = List<String>.from(q['options']);
-              final correctIndex = q['correct_index'] as int;
 
-              return Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        // Список ошибок
+        Expanded(
+          child: ListView.builder(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            itemCount: _wrongAnswers.length + 1, // +1 для блока внизу
+            itemBuilder: (context, index) {
+              // Последний элемент — картинка + кнопка
+              if (index == _wrongAnswers.length) {
+                return Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${index + 1}. Выбери правильный вариант',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _darkText),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: _red, shape: BoxShape.circle),
-                          child: const Icon(Icons.close, color: Colors.white, size: 16),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(q['question'], style: TextStyle(fontSize: 16, color: _darkText)),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: options.map((opt) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _purple,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(opt, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                      )).toList(),
-                    ),
                     const SizedBox(height: 24),
-                    Text.rich(
-                      TextSpan(
-                        text: 'Правильный ответ: ',
-                        style: const TextStyle(fontSize: 15, color: Color(0xFF555555)),
+                    Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
                         children: [
-                          TextSpan(text: options[correctIndex], style: TextStyle(color: _purple, fontWeight: FontWeight.w700)),
+                          Image.asset(
+                            'assets/images/grammer/review_character.png',
+                            height: 160,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/onboarding/onb3.png',
+                              height: 160,
+                            ),
+                          ),
+                          Positioned(
+                            right: -40,
+                            top: 10,
+                            child: Container(
+                              width: 160,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                'Ты молодец! Ошибки это часть обучения )',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text('Объяснение', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _darkText)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _PillButton(
+                        text: 'Продолжить обучение',
+                        color: _orange,
+                        textColor: Colors.black,
+                        onPressed: () => context.pop(),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                );
+              }
+
+              // Карточка ошибки
+              final review = _wrongAnswers[index];
+              final q = review['question'];
+              final options = List<String>.from(q['options']);
+              final userAnswer = review['selected_index'] as int?;
+              final correctAns = q['correct_index'] as int;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Карточка
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${index + 1}. Выбери правильный вариант',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              q['question'],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Poppins',
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Варианты — пилюли
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: List.generate(options.length,
+                                      (optIdx) {
+                                    final isUser = optIdx == userAnswer;
+                                    final isCorrect = optIdx == correctAns;
+
+                                    Color bgColor = _purple;
+                                    double opacity = 0.4;
+
+                                    if (isCorrect) {
+                                      opacity = 1.0;
+                                    }
+
+                                    return Opacity(
+                                      opacity: opacity,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: bgColor,
+                                          borderRadius:
+                                          BorderRadius.circular(24),
+                                        ),
+                                        child: Text(
+                                          options[optIdx],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                            ),
+                          ],
+                        ),
+                        // Красный крест
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: _orange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Правильный ответ
+                  const SizedBox(height: 12),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontFamily: 'Poppins',
+                        color: Colors.black87,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Правильный ответ: '),
+                        TextSpan(
+                          text: options[correctAns],
+                          style: TextStyle(
+                            color: _purple,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Объяснение
+                  if (q['explanation'] != null) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Объяснение',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      q['explanation'] ?? '',
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF555555), height: 1.5),
+                      q['explanation'],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
                   ],
-                ),
+
+                  const SizedBox(height: 24),
+                ],
               );
             },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: 240,
-              child: _CustomButton(
-                text: 'Продолжить обучение',
-                color: _orange,
-                textColor: Colors.black,
-                onPressed: () => context.pop(),
-              ),
-            ),
           ),
         ),
       ],
@@ -545,14 +888,14 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
   }
 }
 
-// Вспомогательный виджет кнопок
-class _CustomButton extends StatelessWidget {
+// ─── КНОПКА-ПИЛЮЛЯ ───────────────────────────────────────────────────────────
+class _PillButton extends StatelessWidget {
   final String text;
   final Color color;
   final Color textColor;
   final VoidCallback? onPressed;
 
-  const _CustomButton({
+  const _PillButton({
     required this.text,
     required this.color,
     required this.textColor,
@@ -565,17 +908,23 @@ class _CustomButton extends StatelessWidget {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        disabledBackgroundColor: color.withOpacity(0.5),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        disabledBackgroundColor: color.withOpacity(0.35),
+        padding:
+        const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
         elevation: 0,
       ),
       child: Text(
         text,
         style: TextStyle(
-            color: onPressed == null ? textColor.withOpacity(0.5) : textColor,
-            fontSize: 15,
-            fontWeight: FontWeight.w700
+          color: onPressed == null
+              ? textColor.withOpacity(0.45)
+              : textColor,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Poppins',
         ),
         textAlign: TextAlign.center,
       ),

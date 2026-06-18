@@ -12,6 +12,8 @@ import '../../presentation/screens/auth/setup/setup_time_screen.dart';
 import '../../presentation/screens/auth/setup/level_test_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/learn/learn_hub_screen.dart';
+import '../../presentation/screens/learn/reading/reading_detail_screen.dart';
+import '../../presentation/screens/learn/reading/reading_test_screen.dart';
 import '../../presentation/screens/progress/progress_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/main_wrapper.dart';
@@ -71,6 +73,21 @@ class AppRouter {
         builder: (context, state) {
           final lessonId = state.extra as int;
           return GrammarTestScreen(lessonId: lessonId);
+        },
+      ),
+
+      GoRoute(
+        path: '/reading/detail',
+        builder: (context, state) {
+          final article = state.extra as Map<String, dynamic>;
+          return ReadingDetailScreen(article: article);
+        },
+      ),
+      GoRoute(
+        path: '/reading/test',
+        builder: (context, state) {
+          final articleId = state.extra as int;
+          return ReadingTestScreen(articleId: articleId);
         },
       ),
 

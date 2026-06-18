@@ -5,6 +5,7 @@ import '../../../../core/constants/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../learn/grammar/grammar_screen.dart';
 import '../learn/flashcards/flashcards_tab.dart';
+import '../learn/reading/reading_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -137,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   FlashcardsTab(currentLevel: _currentLevel),          // 2: Карточки
                   const GrammarScreen(),                               // 3: Грамматика
                   const Center(child: Text('Экран слушания (В разработке)')), // 4: Слушание
-                  const Center(child: Text('Экран чтения (В разработке)')),   // 5: Чтение
+                  const ReadingScreen(),                               // 5: Чтение
                 ],
               ),
             ),
