@@ -12,7 +12,10 @@ class GrammarScreen extends StatefulWidget {
 
 class _GrammarScreenState extends State<GrammarScreen> {
   final _supabase = Supabase.instance.client;
+  final TextEditingController _searchCtrl = TextEditingController();
+
   List<Map<String, dynamic>> _lessons = [];
+  List<Map<String, dynamic>> _filteredLessons = []; // Отфильтрованный список для отображения
   bool _isLoading = true;
   String _selectedLevel = 'A1';
 
@@ -27,8 +30,18 @@ class _GrammarScreenState extends State<GrammarScreen> {
   void initState() {
     super.initState();
     _fetchLessons();
+
+    // Добавляем слушатель на изменение текста в поисковике
+    _searchCtrl.addListener(_filterLessons);
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  // Загрузка всех уроков выбранного уровня из БД
   Future<void> _fetchLessons() async {
     try {
       setState(() => _isLoading = true);
@@ -37,36 +50,70 @@ class _GrammarScreenState extends State<GrammarScreen> {
           .select()
           .eq('level', _selectedLevel)
           .order('created_at');
-      
+
       setState(() {
         _lessons = List<Map<String, dynamic>>.from(data);
+        _filteredLessons = _lessons; // Изначально показываем все уроки
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error fetching grammar: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Локальная фильтрация списка по введенному тексту
+  void _filterLessons() {
+    final query = _searchCtrl.text.toLowerCase().trim();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredLessons = _lessons;
+      } else {
+        _filteredLessons = _lessons.where((lesson) {
+          final title = lesson['title'].toString().toLowerCase();
+          return title.contains(query);
+        }).toList();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // 1. Поисковик (Дизайн перенесен из FlashcardSearchScreen)
         Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Найти тему',
-              prefixIcon: const Icon(Icons.search, color: Color(0xFFAAAAAA)),
-              filled: true,
-              fillColor: const Color(0xFFF5F7FA),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide.none,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F7FA), // Или AppColors.surfaceVariant, если он у вас есть
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: TextField(
+              controller: _searchCtrl,
+              style: const TextStyle(fontSize: 14, fontFamily: 'Poppins', fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'Найти тему...',
+                hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontFamily: 'Poppins'),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFAAAAAA), size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear, color: Color(0xFFAAAAAA), size: 20),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    FocusScope.of(context).unfocus(); // Убираем клавиатуру при очистке
+                  },
+                )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
         ),
+
+        // 2. Выбор уровня
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -96,12 +143,19 @@ class _GrammarScreenState extends State<GrammarScreen> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // 3. Список уроков
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-              : _lessons.isEmpty 
-                ? const Center(child: Text('Уроков пока нет'))
-                : GridView.builder(
+              : _filteredLessons.isEmpty
+              ? Center(
+            child: Text(
+              _searchCtrl.text.isEmpty ? 'Уроков пока нет' : 'Ничего не найдено',
+              style: const TextStyle(fontFamily: 'Poppins', color: Colors.grey),
+            ),
+          )
+              : GridView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -109,9 +163,9 @@ class _GrammarScreenState extends State<GrammarScreen> {
               mainAxisSpacing: 12,
               childAspectRatio: 1.0,
             ),
-            itemCount: _lessons.length,
+            itemCount: _filteredLessons.length, // Используем отфильтрованный список
             itemBuilder: (context, index) {
-              final lesson = _lessons[index];
+              final lesson = _filteredLessons[index]; // Используем отфильтрованный список
               final color = _cardColors[index % _cardColors.length];
 
               return GestureDetector(
@@ -137,7 +191,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Учимся представляться и говорить о себе',
+                        'Учимся грамматике и правилам',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 11, color: Colors.black87),
