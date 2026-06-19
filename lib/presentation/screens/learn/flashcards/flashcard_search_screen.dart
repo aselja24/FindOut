@@ -116,10 +116,35 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   // --- ЛОГИКА СКАЧИВАНИЯ (КЛОНИРОВАНИЯ) МОДУЛЯ ---
 
   Future<void> _downloadModule(Map<String, dynamic> module, {int? targetFolderId}) async {
-    setState(() => _isLoading = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
+
+      // ЗАЩИТА ОТ ДУБЛИКАТОВ: Проверяем, не скачивали ли мы его уже
+      final existingRes = await Supabase.instance.client
+          .from('flashcard_modules')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('original_module_id', module['id'])
+          .maybeSingle();
+
+      if (existingRes != null) {
+        // Если модуль уже был скачан ранее, просто кладем его в новую папку (если нужно)
+        if (targetFolderId != null) {
+          await Supabase.instance.client
+              .from('flashcard_modules')
+              .update({'folder_id': targetFolderId})
+              .eq('id', existingRes['id']);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Модуль уже есть в вашей библиотеке и добавлен в папку!', style: TextStyle(fontFamily: 'Poppins')))
+          );
+        }
+        return; // Прерываем функцию, чтобы не качать карточки по второму кругу
+      }
+
+      setState(() => _isLoading = true);
 
       final colorHex = '0x${(module['color'] as Color).value.toRadixString(16).toUpperCase()}';
 
@@ -128,9 +153,9 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
         'user_id': userId,
         'title': module['title'],
         'color': colorHex,
-        'is_public': false, // Скачанный модуль по умолчанию приватный
+        'is_public': false,
         'original_module_id': module['id'],
-        if (targetFolderId != null) 'folder_id': targetFolderId, // Если скачиваем сразу в папку
+        if (targetFolderId != null) 'folder_id': targetFolderId,
       }).select('id').single();
 
       final newModuleId = newModuleRes['id'];
@@ -143,7 +168,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
 
       final originalCards = cardsRes as List<dynamic>;
       if (originalCards.isNotEmpty) {
-        // ИСПРАВЛЕНИЕ: Добавлена строгая типизация Map<String, dynamic> и проверка полей
         final cardsToInsert = originalCards.map<Map<String, dynamic>>((c) {
           final map = c as Map<String, dynamic>;
           return {
@@ -320,7 +344,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
 
             _buildSheetActionRow(Icons.create_new_folder_outlined, 'Добавить в папку', () {
               Navigator.pop(ctx);
-              _showAddToFolderSheet(module); // ПЕРЕДАЕМ ВЕСЬ МОДУЛЬ, А НЕ ТОЛЬКО ID
+              _showAddToFolderSheet(module);
             }),
             const SizedBox(height: 18),
 
@@ -346,7 +370,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
             else
               _buildSheetActionRow(Icons.file_download_outlined, 'Скачать', () {
                 Navigator.pop(ctx);
-                _downloadModule(module); // ВЫЗЫВАЕМ СКАЧИВАНИЕ
+                _downloadModule(module);
               }),
           ],
         ),
@@ -370,6 +394,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   // 2. Меню выбора папки
   void _showAddToFolderSheet(Map<String, dynamic> module) {
     int? selectedFolderId;
+    bool isSaving = false; // Блокировка от двойного нажатия
 
     showModalBottomSheet(
       context: context,
@@ -408,31 +433,38 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                   ),
                   const SizedBox(height: 12),
 
+                  if (isSaving)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 20, bottom: 10),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    ),
+
                   ..._userFolders.map((folder) {
                     final isSelected = selectedFolderId == folder['id'];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: GestureDetector(
-                        onTap: () async {
-                          setModalState(() => selectedFolderId = folder['id']);
+                        onTap: isSaving ? null : () async {
+                          setModalState(() {
+                            selectedFolderId = folder['id'];
+                            isSaving = true;
+                          });
 
                           final currentUserId = Supabase.instance.client.auth.currentUser?.id;
                           final bool isOwned = module['user_id'] == currentUserId;
 
-                          if (isOwned) {
-                            // Если модуль наш, просто обновляем его folder_id
-                            try {
+                          try {
+                            if (isOwned) {
                               await Supabase.instance.client.from('flashcard_modules').update({'folder_id': folder['id']}).eq('id', module['id']);
                               if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Добавлено в папку!')));
-                            } catch(e) {}
-                          } else {
-                            // Если модуль чужой, сначала скачиваем его, и кладем в папку
-                            await _downloadModule(module, targetFolderId: folder['id']);
+                            } else {
+                              await _downloadModule(module, targetFolderId: folder['id']);
+                            }
+                          } finally {
+                            Future.delayed(const Duration(milliseconds: 300), () {
+                              if (mounted) Navigator.pop(ctx);
+                            });
                           }
-
-                          Future.delayed(const Duration(milliseconds: 300), () {
-                            if (mounted) Navigator.pop(ctx);
-                          });
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -462,85 +494,96 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   // 3. Меню создания новой папки
   void _showCreateFolderSheet(Map<String, dynamic> moduleToLink) {
     final folderCtrl = TextEditingController();
+    bool isSaving = false; // Блокировка от двойного нажатия
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 24),
-            const Text('Новая папка', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-            const SizedBox(height: 16),
+      builder: (ctx) => StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 24),
+                  const Text('Новая папка', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                  const SizedBox(height: 16),
 
-            Container(
-              decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(16)),
-              child: TextField(
-                controller: folderCtrl,
-                autofocus: true,
-                style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
-                decoration: const InputDecoration(
-                  hintText: 'Введите название папки...',
-                  hintStyle: TextStyle(color: Color(0xFFAAAAAA), fontFamily: 'Poppins'),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                ),
+                  Container(
+                    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(16)),
+                    child: TextField(
+                      controller: folderCtrl,
+                      autofocus: true,
+                      enabled: !isSaving, // Блокируем поле при сохранении
+                      style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
+                      decoration: const InputDecoration(
+                        hintText: 'Введите название папки...',
+                        hintStyle: TextStyle(color: Color(0xFFAAAAAA), fontFamily: 'Poppins'),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : () async {
+                        if (folderCtrl.text.trim().isEmpty) return;
+
+                        setModalState(() => isSaving = true); // БЛОКИРУЕМ КНОПКУ
+
+                        try {
+                          final userId = Supabase.instance.client.auth.currentUser?.id;
+
+                          // 1. Создаем папку в БД
+                          final res = await Supabase.instance.client.from('flashcard_folders').insert({
+                            'user_id': userId,
+                            'name': folderCtrl.text.trim(),
+                          }).select().single();
+
+                          setState(() {
+                            _userFolders.insert(0, res as Map<String, dynamic>);
+                          });
+
+                          // 2. Привязываем модуль
+                          final bool isOwned = moduleToLink['user_id'] == userId;
+                          if (isOwned) {
+                            await Supabase.instance.client.from('flashcard_modules').update({'folder_id': res['id']}).eq('id', moduleToLink['id']);
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Папка создана, модуль добавлен!')));
+                          } else {
+                            await _downloadModule(moduleToLink, targetFolderId: res['id']);
+                          }
+
+                          if (mounted) Navigator.pop(ctx);
+                        } catch (e) {
+                          debugPrint('Ошибка создания папки: $e');
+                        } finally {
+                          if (mounted) setModalState(() => isSaving = false); // РАЗБЛОКИРУЕМ (если вдруг ошибка)
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                      ),
+                      child: isSaving
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Создать папку', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (folderCtrl.text.trim().isEmpty) return;
-
-                  try {
-                    final userId = Supabase.instance.client.auth.currentUser?.id;
-
-                    // 1. Создаем папку в БД
-                    final res = await Supabase.instance.client.from('flashcard_folders').insert({
-                      'user_id': userId,
-                      'name': folderCtrl.text.trim(),
-                    }).select().single();
-
-                    setState(() {
-                      // ИСПРАВЛЕНИЕ: Добавлено приведение типа
-                      _userFolders.insert(0, res as Map<String, dynamic>);
-                    });
-
-                    // 2. Сразу привязываем к ней модуль!
-                    final bool isOwned = moduleToLink['user_id'] == userId;
-                    if (isOwned) {
-                      await Supabase.instance.client.from('flashcard_modules').update({'folder_id': res['id']}).eq('id', moduleToLink['id']);
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Папка создана, модуль добавлен!')));
-                    } else {
-                      await _downloadModule(moduleToLink, targetFolderId: res['id']);
-                    }
-
-                    if (mounted) Navigator.pop(ctx);
-                  } catch (e) {
-                    debugPrint('Ошибка создания папки: $e');
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                ),
-                child: const Text('Создать папку', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-              ),
-            ),
-          ],
-        ),
+            );
+          }
       ),
     );
   }

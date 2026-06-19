@@ -20,7 +20,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
 
   int _currentIndex = 0;
   bool _isFlipped = false;
-  bool _progressSaved = false; // Рухсари
+  bool _progressSaved = false;
 
   // Настройки
   bool _shuffle = false;
@@ -389,7 +389,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Image.asset(
                 'assets/images/flash/flash.png',
-                fit: BoxFit.contain, // Картинка будет масштабироваться без обрезки
+                fit: BoxFit.contain,
               ),
             ),
           ),

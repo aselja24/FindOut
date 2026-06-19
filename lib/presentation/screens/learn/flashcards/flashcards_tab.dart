@@ -23,7 +23,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _modules = [];
   List<Map<String, dynamic>> _folders = [];
-
   final Set<int> _hiddenModuleIds = {};
 
   // Состояние Библиотеки
@@ -35,6 +34,12 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   int _currentPage = 0;
   Timer? _carouselTimer;
 
+  // Цветовая палитра для карусели
+  final List<Color> _palette = [
+    const Color(0xFFFFA5D9),
+    const Color(0xFFBAA1F6),
+    AppColors.accent
+  ];
 
   @override
   void initState() {
@@ -125,7 +130,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
           _isLoading = false;
         });
 
-        final activeItemsCount = _modules.where((m) => m['total'] > 0).length;
+        final activeItemsCount = _modules.where((m) => m['total'] > 0 && !_hiddenModuleIds.contains(m['id'])).length;
         _startCarouselTimer(activeItemsCount);
       }
     } catch (e) {
@@ -151,7 +156,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
 
   Widget _buildContinueLearningCarousel() {
     final items = _modules.where((m) => m['total'] > 0 && !_hiddenModuleIds.contains(m['id'])).toList();
-
     if (items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(20),
@@ -215,7 +219,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                                       moduleId: item['id'],
                                     ),
                                   ),
-                                );
+                                ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ ПРОГРЕССА
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.4),
@@ -303,7 +307,10 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
         Expanded(
           child: GestureDetector(
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const FlashcardSearchScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FlashcardSearchScreen()),
+              ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ ПРИ ВОЗВРАТЕ ИЗ ПОИСКА (Если скачали модуль)
             },
             child: Container(
               height: 46,
@@ -375,7 +382,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                   isOwned: true,
                 ),
               ),
-            );
+            ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -514,7 +521,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                           isOwned: true,
                         ),
                       ),
-                    );
+                    ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ БИБЛИОТЕКИ ПРИ ВОЗВРАТЕ
                   } else {
                     final folderItem = _folders[idx];
                     Navigator.push(
@@ -525,7 +532,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                           initialFolderName: folderItem['name'],
                         ),
                       ),
-                    ).then((_) => _fetchData()); // Обновляем библиотеку при возврате
+                    ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ БИБЛИОТЕКИ ПРИ ВОЗВРАТЕ ИЗ ПАПКИ
                   }
                 },
                 child: Container(
@@ -599,10 +606,10 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                     moduleId: item['id'],
                     title: item['title'],
                     color: item['color'],
-                    isOwned: true, // Считаем его своим
+                    isOwned: true,
                   ),
                 ),
-              );
+              ).then((_) => _fetchData()); // Обновляем при возврате
             }),
             const SizedBox(height: 16),
 
@@ -610,9 +617,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
             _buildActionMenuRow(Icons.visibility_off_outlined, 'Скрыть', () {
               Navigator.pop(ctx);
               setState(() {
-                _hiddenModuleIds.add(item['id']); // Добавляем ID в список скрытых
-
-                // Пересчитываем карусель, чтобы не сломался таймер
+                _hiddenModuleIds.add(item['id']);
                 final activeCount = _modules.where((m) => m['total'] > 0 && !_hiddenModuleIds.contains(m['id'])).length;
                 if (activeCount <= 1) _carouselTimer?.cancel();
               });
