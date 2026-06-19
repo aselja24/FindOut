@@ -60,17 +60,45 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
 
   Future<void> _saveProgressToDB() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      try {
-        await Supabase.instance.client.from('user_progress').upsert({
+    if (user == null || _questions.isEmpty) return;
+
+    try {
+      // Высчитываем процент правильных ответов
+      final int percent = ((_correctAnswersCount / _questions.length) * 100).round();
+
+      // 1. Ищем, есть ли уже прогресс по этой статье
+      final existing = await Supabase.instance.client
+          .from('user_progress')
+          .select('id, score_percentage')
+          .eq('user_id', user.id)
+          .eq('item_type', 'reading_test')
+          .eq('item_id', widget.articleId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // 2. Если результат уже есть, обновляем его (только если новый процент выше)
+        final int oldScore = (existing['score_percentage'] ?? 0) as int;
+        if (percent > oldScore) {
+          await Supabase.instance.client
+              .from('user_progress')
+              .update({
+            'score_percentage': percent,
+            'completed_at': DateTime.now().toIso8601String()
+          })
+              .eq('id', existing['id']);
+        }
+      } else {
+        // 3. Если результата еще нет, создаем новую запись
+        await Supabase.instance.client.from('user_progress').insert({
           'user_id': user.id,
           'item_type': 'reading_test',
           'item_id': widget.articleId,
+          'score_percentage': percent,
           'completed_at': DateTime.now().toIso8601String(),
         });
-      } catch (e) {
-        debugPrint('Ошибка сохранения прогресса: $e');
       }
+    } catch (e) {
+      debugPrint('Ошибка сохранения прогресса: $e');
     }
   }
 
@@ -512,10 +540,10 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                   children: [
                     Center(
                       child: Image.asset(
-                        'assets/images/reading/result_character.png',
+                        'assets/images/reading/result_character_1.png',
                         height: 220,
                         errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/onboarding/onb3.png',
+                          'assets/images/reading/result_character_1.png',
                           height: 220,
                         ),
                       ),
@@ -649,10 +677,10 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                         clipBehavior: Clip.none,
                         children: [
                           Image.asset(
-                            'assets/images/reading/review_character.png',
+                            'assets/images/grammer/review_character.png',
                             height: 160,
                             errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/onboarding/onb3.png',
+                              'assets/images/grammer/review_character.png',
                               height: 160,
                             ),
                           ),

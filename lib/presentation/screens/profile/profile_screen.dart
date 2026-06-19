@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
+  // 1. Создаем глобальный сигнал для обновления
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier(0);
+
   const ProfileScreen({super.key});
 
   @override
@@ -12,10 +15,10 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _supabase = Supabase.instance.client;
   Map<String, dynamic>? _profile;
+  List<Map<String, dynamic>> _favoriteArticles = [];
+
   bool _isLoading = true;
   String _email = '';
-
-  // Добавили переменную для хранения выученных слов
   int _wordsLearned = 0;
 
   final Color _purple = const Color(0xFF7B4DFE);
@@ -25,38 +28,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    // 2. Начинаем слушать сигналы об обновлении
+    ProfileScreen.refreshNotifier.addListener(_onRefreshNeeded);
+  }
+
+  @override
+  void dispose() {
+    // 3. Отключаем слушатель при закрытии (чтобы не было утечек памяти)
+    ProfileScreen.refreshNotifier.removeListener(_onRefreshNeeded);
+    super.dispose();
+  }
+
+  void _onRefreshNeeded() {
+    if (mounted) {
+      _loadProfile(); // Перезагружаем профиль, когда приходит сигнал
+    }
   }
 
   Future<void> _loadProfile() async {
+    // ... здесь остается твой старый код загрузки (_loadProfile) ...
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
 
       _email = user.email ?? '';
 
-      // 1. Загружаем данные профиля
+      // 1. Данные профиля
       final data = await _supabase
           .from('profiles')
           .select()
           .eq('id', user.id)
           .maybeSingle();
 
-      // 2. Считаем выученные слова (из пройденных модулей)
+      // 2. Подсчет выученных слов
       int learnedCount = 0;
       final modulesData = await _supabase
           .from('flashcard_modules')
           .select('id, flashcards(is_learned)')
-          .eq('user_id', user.id); // Берем только модули этого юзера
+          .eq('user_id', user.id);
 
       for (var m in modulesData) {
         final cards = m['flashcards'] as List<dynamic>? ?? [];
-        // Плюсуем только те карточки, которые помечены как изученные
         learnedCount += cards.where((c) => c['is_learned'] == true).length;
+      }
+
+      // 3. Загрузка избранных статей
+      final favData = await _supabase
+          .from('favorite_articles')
+          .select('culture_articles(*)')
+          .eq('user_id', user.id);
+
+      // Получаем прогресс пользователя по статьям, чтобы показать проценты в избранном
+      final progressData = await _supabase
+          .from('user_progress')
+          .select('item_id, score_percentage')
+          .eq('user_id', user.id)
+          .eq('item_type', 'reading_test');
+
+      List<Map<String, dynamic>> favArticles = [];
+      for (var f in favData) {
+        final article = f['culture_articles'];
+        if (article != null) {
+          final prog = progressData.firstWhere(
+                  (p) => p['item_id'] == article['id'],
+              orElse: () => {}
+          );
+          final int percent = prog.isNotEmpty ? (prog['score_percentage'] ?? 0) as int : 0;
+
+          favArticles.add({
+            ...article,
+            'progress_percent': percent,
+          });
+        }
       }
 
       setState(() {
         _profile = data;
-        _wordsLearned = learnedCount; // Сохраняем подсчитанную сумму
+        _wordsLearned = learnedCount;
+        _favoriteArticles = favArticles;
         _isLoading = false;
       });
     } catch (e) {
@@ -79,10 +128,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = _profile?['first_name'] ?? 'Имя пользователя';
     final level = _profile?['language_level'] ?? 'A1';
     final streak = _profile?['streak_days'] ?? 0;
-
-    // Передаем реальное значение выученных слов
     final wordsLearned = _wordsLearned;
-    final lessonsCompleted = 5; // Пока оставляем моком (доделаем когда будут уроки)
+    final lessonsCompleted = 5;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -95,7 +142,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const Text('Профиль', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
               const SizedBox(height: 24),
 
-              // Имя и Email
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -112,7 +158,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Уровень и Прогресс-бар
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -135,7 +180,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Блок языка
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(20)),
@@ -159,7 +203,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Статистика
               const Text('Статистика', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Row(
@@ -172,36 +215,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Избранные статьи
+              // Блок Избранных статей
               const Text('Избранные статьи', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFEEEEEE)),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(12)), child: const Text('A1-A2', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
-                        const SizedBox(width: 8),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFFF9DE6), borderRadius: BorderRadius.circular(12)), child: const Text('Места', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
-                        const Spacer(),
-                        const Text('65%', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Берлинская стена', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const Text('Разделение и объединение страны', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
+              if (_favoriteArticles.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16.0),
+                  child: Text('У вас пока нет избранных статей.', style: TextStyle(color: Colors.grey)),
+                )
+              else
+                ..._favoriteArticles.map((article) => _buildFavoriteArticleCard(article)).toList(),
 
-              // Настройки и прочее
+              const SizedBox(height: 16),
+
               _buildListTile('Настройки', Icons.settings_outlined, onTap: () async {
                 await context.push('/settings');
                 _loadProfile();
@@ -224,6 +250,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 4),
         Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
       ],
+    );
+  }
+
+  // Виджет карточки для избранных
+  Widget _buildFavoriteArticleCard(Map<String, dynamic> article) {
+    final percent = article['progress_percent'] ?? 0;
+
+    return GestureDetector(
+      onTap: () async {
+        await context.push('/reading/detail', extra: article);
+        _loadProfile(); // Обновляем профиль при возврате (мог поменяться процент или убрали лайк)
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFEEEEEE)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(12)), child: Text(article['level_restriction'] ?? 'A1', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+                const SizedBox(width: 8),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFFF9DE6), borderRadius: BorderRadius.circular(12)), child: Text(article['category'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+                const Spacer(),
+                Text('$percent%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(article['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Text('Разделение и объединение страны', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ),
     );
   }
 

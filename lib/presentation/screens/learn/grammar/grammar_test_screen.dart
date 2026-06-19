@@ -509,7 +509,7 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                         'assets/images/grammer/result_character.png',
                         height: 220,
                         errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/onboarding/onb3.png',
+                          'assets/images/grammer/result_character.png',
                           height: 220,
                         ),
                       ),
@@ -647,7 +647,7 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                             'assets/images/grammer/review_character.png',
                             height: 160,
                             errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/onboarding/onb3.png',
+                              'assets/images/grammer/review_character.png',
                               height: 160,
                             ),
                           ),
