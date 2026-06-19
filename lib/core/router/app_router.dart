@@ -11,7 +11,7 @@ import '../../presentation/screens/auth/setup/setup_level_screen.dart';
 import '../../presentation/screens/auth/setup/setup_time_screen.dart';
 import '../../presentation/screens/auth/setup/level_test_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
-import '../../presentation/screens/learn/learn_hub_screen.dart';
+import '../../presentation/screens/learn/lessons/lessons_screen.dart';
 import '../../presentation/screens/learn/reading/reading_detail_screen.dart';
 import '../../presentation/screens/learn/reading/reading_test_screen.dart';
 import '../../presentation/screens/progress/progress_screen.dart';
@@ -114,7 +114,7 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: '/lessons',
-                builder: (context, state) => const LearnHubScreen(),
+                builder: (context, state) => const LessonsScreen(),
               ),
             ],
           ),

@@ -14,10 +14,12 @@ class _GrammarScreenState extends State<GrammarScreen> {
   final _supabase = Supabase.instance.client;
   final TextEditingController _searchCtrl = TextEditingController();
 
-  List<Map<String, dynamic>> _lessons = [];
-  List<Map<String, dynamic>> _filteredLessons = []; // Отфильтрованный список для отображения
+  List<Map<String, dynamic>> _allLessons = []; // Храним вообще ВСЕ уроки из базы
+  List<Map<String, dynamic>> _filteredLessons = []; // То, что показываем сейчас
   bool _isLoading = true;
-  String _selectedLevel = 'A1';
+
+  String _selectedLevel = 'A1-A2';
+  final List<String> _levels = ['A1-A2', 'B1-B2', 'C1-C2'];
 
   final List<Color> _cardColors = [
     const Color(0xFFBAA1F6),
@@ -29,9 +31,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLessons();
-
-    // Добавляем слушатель на изменение текста в поисковике
+    _fetchAllLessons(); // Загружаем все уровни разом
     _searchCtrl.addListener(_filterLessons);
   }
 
@@ -41,19 +41,18 @@ class _GrammarScreenState extends State<GrammarScreen> {
     super.dispose();
   }
 
-  // Загрузка всех уроков выбранного уровня из БД
-  Future<void> _fetchLessons() async {
+  // Загружаем ВСЕ уроки один раз
+  Future<void> _fetchAllLessons() async {
     try {
       setState(() => _isLoading = true);
       final data = await _supabase
           .from('grammar_lessons')
           .select()
-          .eq('level', _selectedLevel)
-          .order('created_at');
+          .order('created_at'); // Убрали фильтр .eq('level'), качаем всё
 
       setState(() {
-        _lessons = List<Map<String, dynamic>>.from(data);
-        _filteredLessons = _lessons; // Изначально показываем все уроки
+        _allLessons = List<Map<String, dynamic>>.from(data);
+        _filterLessons(); // Сразу применяем фильтры
         _isLoading = false;
       });
     } catch (e) {
@@ -62,14 +61,16 @@ class _GrammarScreenState extends State<GrammarScreen> {
     }
   }
 
-  // Локальная фильтрация списка по введенному тексту
+  // Локальная фильтрация: либо по уровню, либо глобальный поиск
   void _filterLessons() {
     final query = _searchCtrl.text.toLowerCase().trim();
     setState(() {
       if (query.isEmpty) {
-        _filteredLessons = _lessons;
+        // Если поиска нет, показываем только выбранный уровень
+        _filteredLessons = _allLessons.where((lesson) => lesson['level'] == _selectedLevel).toList();
       } else {
-        _filteredLessons = _lessons.where((lesson) {
+        // Если человек ищет, ищем ВЕЗДЕ (игнорируем выбранный уровень)
+        _filteredLessons = _allLessons.where((lesson) {
           final title = lesson['title'].toString().toLowerCase();
           return title.contains(query);
         }).toList();
@@ -77,17 +78,26 @@ class _GrammarScreenState extends State<GrammarScreen> {
     });
   }
 
+  String _getLevelLabel(String level) {
+    switch (level) {
+      case 'A1-A2': return 'A1-A2 начинающий';
+      case 'B1-B2': return 'B1-B2 средний';
+      case 'C1-C2': return 'C1-C2 продвинутый';
+      default: return level;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 1. Поисковик (Дизайн перенесен из FlashcardSearchScreen)
+        // 1. Поисковик
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Container(
             height: 46,
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F7FA), // Или AppColors.surfaceVariant, если он у вас есть
+              color: const Color(0xFFF5F7FA),
               borderRadius: BorderRadius.circular(24),
             ),
             child: TextField(
@@ -102,7 +112,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                   icon: const Icon(Icons.clear, color: Color(0xFFAAAAAA), size: 20),
                   onPressed: () {
                     _searchCtrl.clear();
-                    FocusScope.of(context).unfocus(); // Убираем клавиатуру при очистке
+                    FocusScope.of(context).unfocus();
                   },
                 )
                     : null,
@@ -123,21 +133,44 @@ class _GrammarScreenState extends State<GrammarScreen> {
                 'Выбери уровень',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, fontFamily: 'Poppins'),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(20),
+              PopupMenuButton<String>(
+                initialValue: _selectedLevel,
+                onSelected: (String level) {
+                  setState(() {
+                    _selectedLevel = level;
+                    // Если человек переключил уровень, очищаем поиск, чтобы показать уроки уровня
+                    if (_searchCtrl.text.isNotEmpty) {
+                      _searchCtrl.clear();
+                    }
+                    _filterLessons(); // Фильтруем локально (БЕЗ запроса в БД)
+                  });
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                offset: const Offset(0, 40),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _getLevelLabel(_selectedLevel),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.black),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Text(
-                      '$_selectedLevel-начинающий',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                    const Icon(Icons.keyboard_arrow_down, size: 18),
-                  ],
-                ),
+                itemBuilder: (context) => _levels.map((lvl) => PopupMenuItem(
+                  value: lvl,
+                  child: Text(
+                    _getLevelLabel(lvl),
+                    style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+                  ),
+                )).toList(),
               ),
             ],
           ),
@@ -151,7 +184,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
               : _filteredLessons.isEmpty
               ? Center(
             child: Text(
-              _searchCtrl.text.isEmpty ? 'Уроков пока нет' : 'Ничего не найдено',
+              _searchCtrl.text.isEmpty ? 'Уроков пока нет' : 'Поиск не дал результатов',
               style: const TextStyle(fontFamily: 'Poppins', color: Colors.grey),
             ),
           )
@@ -163,9 +196,9 @@ class _GrammarScreenState extends State<GrammarScreen> {
               mainAxisSpacing: 12,
               childAspectRatio: 1.0,
             ),
-            itemCount: _filteredLessons.length, // Используем отфильтрованный список
+            itemCount: _filteredLessons.length,
             itemBuilder: (context, index) {
-              final lesson = _filteredLessons[index]; // Используем отфильтрованный список
+              final lesson = _filteredLessons[index];
               final color = _cardColors[index % _cardColors.length];
 
               return GestureDetector(
@@ -179,9 +212,22 @@ class _GrammarScreenState extends State<GrammarScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Выводим уровень темы
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          lesson['level'] ?? '',
+                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, fontFamily: 'Poppins'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         lesson['title'],
-                        maxLines: 3,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 14,
