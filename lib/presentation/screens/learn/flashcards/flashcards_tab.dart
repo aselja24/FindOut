@@ -24,6 +24,8 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   List<Map<String, dynamic>> _modules = [];
   List<Map<String, dynamic>> _folders = [];
 
+  final Set<int> _hiddenModuleIds = {};
+
   // Состояние Библиотеки
   bool _isModulesSelected = true;
   String _selectedLibraryFilter = 'Все';
@@ -33,12 +35,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   int _currentPage = 0;
   Timer? _carouselTimer;
 
-  // Цветовая палитра для карусели
-  final List<Color> _palette = [
-    const Color(0xFFFFA5D9),
-    const Color(0xFFBAA1F6),
-    AppColors.accent
-  ];
 
   @override
   void initState() {
@@ -154,7 +150,8 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   }
 
   Widget _buildContinueLearningCarousel() {
-    final items = _modules.where((m) => m['total'] > 0).toList();
+    final items = _modules.where((m) => m['total'] > 0 && !_hiddenModuleIds.contains(m['id'])).toList();
+
     if (items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(20),
@@ -234,7 +231,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                       Positioned(
                         right: 0, top: 0,
                         child: GestureDetector(
-                          onTap: () => _showModuleActionMenu(item['title']),
+                          onTap: () => _showModuleActionMenu(item),
                           child: const Icon(Icons.more_vert_rounded, color: AppColors.textPrimary),
                         ),
                       )
@@ -351,7 +348,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
   }
 
   Widget _buildRecentGrid() {
-    final items = _modules.take(4).toList();
+    final items = _modules.where((m) => !_hiddenModuleIds.contains(m['id'])).take(4).toList();
     if (items.isEmpty) return const SizedBox();
 
     return GridView.builder(
@@ -579,7 +576,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     );
   }
 
-  void _showModuleActionMenu(String title) {
+  void _showModuleActionMenu(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -591,9 +588,35 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
           children: [
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 24),
-            _buildActionMenuRow(Icons.style_outlined, 'Перейти к модулю', () => Navigator.pop(ctx)),
+
+            // Кнопка: Перейти к модулю
+            _buildActionMenuRow(Icons.layers_outlined, 'Перейти к модулю', () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FlashcardsScreen(
+                    moduleId: item['id'],
+                    title: item['title'],
+                    color: item['color'],
+                    isOwned: true, // Считаем его своим
+                  ),
+                ),
+              );
+            }),
             const SizedBox(height: 16),
-            _buildActionMenuRow(Icons.visibility_off_outlined, 'Скрыть', () => Navigator.pop(ctx)),
+
+            // Кнопка: Скрыть
+            _buildActionMenuRow(Icons.visibility_off_outlined, 'Скрыть', () {
+              Navigator.pop(ctx);
+              setState(() {
+                _hiddenModuleIds.add(item['id']); // Добавляем ID в список скрытых
+
+                // Пересчитываем карусель, чтобы не сломался таймер
+                final activeCount = _modules.where((m) => m['total'] > 0 && !_hiddenModuleIds.contains(m['id'])).length;
+                if (activeCount <= 1) _carouselTimer?.cancel();
+              });
+            }),
             const SizedBox(height: 12),
           ],
         ),
