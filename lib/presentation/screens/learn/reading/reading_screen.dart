@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../profile/profile_screen.dart';
 
 class ReadingScreen extends StatefulWidget {
   const ReadingScreen({super.key});
@@ -21,26 +22,61 @@ class _ReadingScreenState extends State<ReadingScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchArticles();
+    _fetchArticlesAndProgress();
   }
 
-  Future<void> _fetchArticles() async {
+  Future<void> _fetchArticlesAndProgress() async {
     try {
       setState(() => _isLoading = true);
+      final user = _supabase.auth.currentUser;
 
-      // 1. Создаем базовый запрос без сортировки
+      // 1. Формируем запрос на статьи
       var query = _supabase.from('culture_articles').select();
-
-      // 2. Добавляем фильтр, если выбрана конкретная категория
       if (_selectedCategory != 'Все') {
         query = query.eq('category', _selectedCategory);
       }
+      final articlesData = await query.order('created_at');
 
-      // 3. Добавляем сортировку и выполняем запрос
-      final data = await query.order('created_at');
+      List<Map<String, dynamic>> progressData = [];
+      List<int> favoriteIds = [];
+
+      if (user != null) {
+        // 2. Получаем прогресс
+        final pData = await _supabase
+            .from('user_progress')
+            .select('item_id, score_percentage')
+            .eq('user_id', user.id)
+            .eq('item_type', 'reading_test');
+        progressData = List<Map<String, dynamic>>.from(pData);
+
+        // 3. Получаем список избранного
+        final favData = await _supabase
+            .from('favorite_articles')
+            .select('article_id')
+            .eq('user_id', user.id);
+        favoriteIds = favData.map((f) => f['article_id'] as int).toList();
+      }
+
+      // 4. Объединяем данные
+      final List<Map<String, dynamic>> mergedArticles = [];
+      for (var article in articlesData) {
+        final articleId = article['id'];
+
+        final prog = progressData.firstWhere(
+                (p) => p['item_id'] == articleId,
+            orElse: () => {}
+        );
+        final int percent = prog.isNotEmpty ? (prog['score_percentage'] ?? 0) as int : 0;
+
+        mergedArticles.add({
+          ...article,
+          'progress_percent': percent,
+          'is_favorite': favoriteIds.contains(articleId), // Флаг лайка
+        });
+      }
 
       setState(() {
-        _articles = List<Map<String, dynamic>>.from(data);
+        _articles = mergedArticles;
         _isLoading = false;
       });
     } catch (e) {
@@ -49,12 +85,55 @@ class _ReadingScreenState extends State<ReadingScreen> {
     }
   }
 
+  // Функция добавления/удаления из избранного
+  Future<void> _toggleFavorite(int articleId, bool isCurrentlyFavorite) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    // Мгновенное обновление UI (оптимистичный подход)
+    setState(() {
+      final index = _articles.indexWhere((a) => a['id'] == articleId);
+      if (index != -1) {
+        _articles[index]['is_favorite'] = !isCurrentlyFavorite;
+      }
+    });
+
+    try {
+      if (isCurrentlyFavorite) {
+        // Удаляем лайк
+        await _supabase
+            .from('favorite_articles')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('article_id', articleId);
+      } else {
+        // Ставим лайк
+        await _supabase.from('favorite_articles').insert({
+          'user_id': user.id,
+          'article_id': articleId,
+        });
+      }
+
+      // ОТПРАВЛЯЕМ СИГНАЛ ПРОФИЛЮ ОБНОВИТЬСЯ:
+      ProfileScreen.refreshNotifier.value++;
+
+    } catch (e) {
+      debugPrint('Ошибка избранного: $e');
+      // В случае ошибки возвращаем как было
+      setState(() {
+        final index = _articles.indexWhere((a) => a['id'] == articleId);
+        if (index != -1) {
+          _articles[index]['is_favorite'] = isCurrentlyFavorite;
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Категории
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -65,7 +144,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 child: GestureDetector(
                   onTap: () {
                     setState(() => _selectedCategory = cat);
-                    _fetchArticles();
+                    _fetchArticlesAndProgress();
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -77,7 +156,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                 ),
               )),
-              // Кнопка уровня
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(color: const Color(0xFFC3F336), borderRadius: BorderRadius.circular(20)),
@@ -116,8 +194,15 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 
   Widget _buildArticleCard(Map<String, dynamic> article) {
+    final int percent = article['progress_percent'] ?? 0;
+    final double progressValue = percent / 100.0;
+    final bool isFavorite = article['is_favorite'] == true;
+
     return GestureDetector(
-      onTap: () => context.push('/reading/detail', extra: article),
+      onTap: () async {
+        await context.push('/reading/detail', extra: article);
+        _fetchArticlesAndProgress();
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
@@ -147,26 +232,33 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     ),
                   ],
                 ),
-                const Icon(Icons.favorite_border, color: Colors.grey, size: 20),
+                GestureDetector(
+                  onTap: () => _toggleFavorite(article['id'], isFavorite),
+                  child: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorite ? Colors.red : Colors.grey,
+                    size: 24,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
             Text(article['title'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)), // Заглушка подзаголовка
+            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: LinearProgressIndicator(
-                    value: 0.65, // Заглушка прогресса
+                    value: progressValue,
                     backgroundColor: const Color(0xFFEEEEEE),
                     color: const Color(0xFF7B4DFE),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text('65%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text('$percent%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             )
           ],
