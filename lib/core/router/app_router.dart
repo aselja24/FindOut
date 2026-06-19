@@ -20,6 +20,7 @@ import '../../presentation/screens/main_wrapper.dart';
 import '../../presentation/screens/learn/grammar/grammar_detail_screen.dart';
 import '../constants/route_constants.dart';
 import '../../presentation/screens/learn/grammar/grammar_test_screen.dart';
+import '../../presentation/screens/profile/settings_screen.dart';
 
 class AppRouter {
   static final _rootKey = GlobalKey<NavigatorState>();
@@ -89,6 +90,11 @@ class AppRouter {
           final articleId = state.extra as int;
           return ReadingTestScreen(articleId: articleId);
         },
+      ),
+
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
 
       StatefulShellRoute.indexedStack(

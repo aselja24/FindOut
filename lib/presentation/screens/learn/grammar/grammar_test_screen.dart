@@ -72,11 +72,13 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     }
   }
 
-  void _checkAnswer() {
+  // Метод для записи результата текущего вопроса
+  void _recordAnswer() {
     if (_selectedOptionIndex == null) return;
 
     final question = _questions[_currentIndex];
-    final correctIndex = question['correct_index'] as int;
+    // Пробуем оба варианта ключа для гибкости и приводим к int
+    final correctIndex = (question['correct_index'] ?? question['correct_option'] as num?)?.toInt() ?? 0;
 
     if (_selectedOptionIndex == correctIndex) {
       _correctAnswersCount++;
@@ -86,6 +88,12 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
         'selected_index': _selectedOptionIndex,
       });
     }
+  }
+
+  void _checkAnswer() {
+    if (_selectedOptionIndex == null) return;
+    
+    _recordAnswer();
 
     setState(() {
       _currentState = TestState.checking;
@@ -93,6 +101,11 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
   }
 
   void _nextQuestion() async {
+    // Если вопрос не был проверен кнопкой "Проверить", записываем его сейчас
+    if (_currentState == TestState.playing) {
+      _recordAnswer();
+    }
+
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
@@ -129,7 +142,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     );
   }
 
-  // ─── TOP HEADER (общий для всех состояний) ───────────────────────────────
   Widget _buildTopHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -177,16 +189,17 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
-              LayoutBuilder(
-                builder: (context, constraints) => Container(
-                  width: constraints.maxWidth * 0.2,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: _green,
-                    borderRadius: BorderRadius.circular(3),
+              if (_questions.isNotEmpty)
+                LayoutBuilder(
+                  builder: (context, constraints) => Container(
+                    width: constraints.maxWidth * ((_currentIndex + 1) / _questions.length),
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: _green,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -214,7 +227,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     );
   }
 
-  // ─── BODY ROUTER ─────────────────────────────────────────────────────────
   Widget _buildBody() {
     switch (_currentState) {
       case TestState.playing:
@@ -229,11 +241,10 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     }
   }
 
-  // ─── TEST CONTENT (playing + checking) ───────────────────────────────────
   Widget _buildTestContent() {
     final question = _questions[_currentIndex];
     final options = List<String>.from(question['options']);
-    final correctIndex = question['correct_index'] as int;
+    final correctIndex = (question['correct_index'] ?? question['correct_option'] as num?)?.toInt() ?? 0;
     final isChecking = _currentState == TestState.checking;
     final hasSelected = _selectedOptionIndex != null;
     final isLastQuestion = _currentIndex == _questions.length - 1;
@@ -246,7 +257,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Заголовок ТЕСТ
           const Text(
             'ТЕСТ',
             style: TextStyle(
@@ -263,7 +273,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
             margin: const EdgeInsets.only(top: 8, bottom: 16),
           ),
 
-          // Тема урока
           if (question['lesson_title'] != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -280,7 +289,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
 
           const SizedBox(height: 8),
 
-          // Карточка с вопросом
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -300,7 +308,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Номер и заголовок вопроса
                     Text(
                       '${_currentIndex + 1}. Выбери правильный вариант',
                       style: const TextStyle(
@@ -311,7 +318,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Текст вопроса
                     Text(
                       question['question'],
                       style: const TextStyle(
@@ -323,7 +329,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Варианты ответов — кнопки-пилюли
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -332,32 +337,12 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                         final isCorrect = correctIndex == index;
 
                         Color bgColor = _purple;
-                        Color textColor = Colors.white;
-                        double opacity = 1.0;
+                        double opacity;
 
                         if (isChecking) {
-                          if (isCorrect) {
-                            // Правильный — остаётся фиолетовым (выделен)
-                            bgColor = _purple;
-                            opacity = 1.0;
-                          } else if (isSelected) {
-                            // Неправильный выбранный — затемнённый
-                            bgColor = _purple;
-                            opacity = 0.4;
-                          } else {
-                            // Остальные — тусклые
-                            bgColor = _purple;
-                            opacity = 0.4;
-                          }
+                          opacity = isCorrect ? 1.0 : 0.4;
                         } else {
-                          // Режим выбора
-                          if (isSelected) {
-                            bgColor = _purple;
-                            opacity = 1.0;
-                          } else {
-                            bgColor = _purple;
-                            opacity = 0.4;
-                          }
+                          opacity = isSelected ? 1.0 : 0.4;
                         }
 
                         return GestureDetector(
@@ -376,8 +361,8 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                               ),
                               child: Text(
                                 options[index],
-                                style: TextStyle(
-                                  color: textColor,
+                                style: const TextStyle(
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
                                   fontFamily: 'Poppins',
@@ -391,7 +376,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                   ],
                 ),
 
-                // Красный крест при неправильном ответе
                 if (isWrong)
                   Positioned(
                     top: 0,
@@ -411,7 +395,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
             ),
           ),
 
-          // Блок "Правильный ответ + Объяснение" (только при checking)
           if (isChecking) ...[
             const SizedBox(height: 16),
             RichText(
@@ -454,7 +437,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            // Кнопка "Дальше" — только справа
             Align(
               alignment: Alignment.centerRight,
               child: _PillButton(
@@ -466,12 +448,10 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
             ),
           ],
 
-          // Кнопки нижнего ряда (только в режиме playing)
           if (!isChecking) ...[
             const SizedBox(height: 32),
             Row(
               children: [
-                // Проверить — всегда слева
                 _PillButton(
                   text: 'Проверить',
                   color: _orange,
@@ -479,7 +459,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                   onPressed: hasSelected ? _checkAnswer : null,
                 ),
                 const Spacer(),
-                // Последний вопрос — "Завершить тест", иначе "Дальше"
                 _PillButton(
                   text: isLastQuestion ? 'Завершить тест' : 'Дальше',
                   color: _green,
@@ -496,7 +475,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     );
   }
 
-  // ─── RESULT ──────────────────────────────────────────────────────────────
   Widget _buildResultContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -523,7 +501,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Персонаж + речевой пузырь
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -579,10 +556,8 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
             ),
           ),
 
-          // Кнопки
           Column(
             children: [
-              // Далее — справа
               Align(
                 alignment: Alignment.centerRight,
                 child: _PillButton(
@@ -625,12 +600,10 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
     );
   }
 
-  // ─── REVIEW ──────────────────────────────────────────────────────────────
   Widget _buildReviewContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Заголовок
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
@@ -655,14 +628,12 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
           ),
         ),
 
-        // Список ошибок
         Expanded(
           child: ListView.builder(
             padding:
             const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            itemCount: _wrongAnswers.length + 1, // +1 для блока внизу
+            itemCount: _wrongAnswers.length + 1,
             itemBuilder: (context, index) {
-              // Последний элемент — картинка + кнопка
               if (index == _wrongAnswers.length) {
                 return Column(
                   children: [
@@ -725,17 +696,15 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                 );
               }
 
-              // Карточка ошибки
               final review = _wrongAnswers[index];
               final q = review['question'];
               final options = List<String>.from(q['options']);
               final userAnswer = review['selected_index'] as int?;
-              final correctAns = q['correct_index'] as int;
+              final correctAns = (q['correct_index'] ?? q['correct_option'] as num?)?.toInt() ?? 0;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Карточка
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -773,21 +742,13 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            // Варианты — пилюли
                             Wrap(
                               spacing: 10,
                               runSpacing: 10,
                               children: List.generate(options.length,
                                       (optIdx) {
-                                    final isUser = optIdx == userAnswer;
                                     final isCorrect = optIdx == correctAns;
-
-                                    Color bgColor = _purple;
-                                    double opacity = 0.4;
-
-                                    if (isCorrect) {
-                                      opacity = 1.0;
-                                    }
+                                    final opacity = isCorrect ? 1.0 : 0.4;
 
                                     return Opacity(
                                       opacity: opacity,
@@ -795,7 +756,7 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 20, vertical: 8),
                                         decoration: BoxDecoration(
-                                          color: bgColor,
+                                          color: _purple,
                                           borderRadius:
                                           BorderRadius.circular(24),
                                         ),
@@ -814,7 +775,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                             ),
                           ],
                         ),
-                        // Красный крест
                         Positioned(
                           top: 0,
                           right: 0,
@@ -833,7 +793,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                     ),
                   ),
 
-                  // Правильный ответ
                   const SizedBox(height: 12),
                   RichText(
                     text: TextSpan(
@@ -855,7 +814,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                     ),
                   ),
 
-                  // Объяснение
                   if (q['explanation'] != null) ...[
                     const SizedBox(height: 12),
                     const Text(
@@ -888,7 +846,6 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
   }
 }
 
-// ─── КНОПКА-ПИЛЮЛЯ ───────────────────────────────────────────────────────────
 class _PillButton extends StatelessWidget {
   final String text;
   final Color color;
