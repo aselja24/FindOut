@@ -28,6 +28,8 @@ dependencies:
   connectivity_plus: ^6.0.3
   get_it: ^7.6.7
 
+  just_audio: ^0.9.36
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

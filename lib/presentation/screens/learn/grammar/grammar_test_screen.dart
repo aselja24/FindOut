@@ -645,10 +645,10 @@ class _GrammarTestScreenState extends State<GrammarTestScreen> {
                         children: [
                           Image.asset(
                             'assets/images/grammer/review_character.png',
-                            height: 160,
+                            height: 300,
                             errorBuilder: (_, __, ___) => Image.asset(
                               'assets/images/grammer/review_character.png',
-                              height: 160,
+                              height: 300,
                             ),
                           ),
                           Positioned(
