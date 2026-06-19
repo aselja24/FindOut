@@ -15,6 +15,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String _email = '';
 
+  // Добавили переменную для хранения выученных слов
+  int _wordsLearned = 0;
+
   final Color _purple = const Color(0xFF7B4DFE);
   final Color _green = const Color(0xFFC3F336);
 
@@ -31,14 +34,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       _email = user.email ?? '';
 
+      // 1. Загружаем данные профиля
       final data = await _supabase
           .from('profiles')
           .select()
           .eq('id', user.id)
           .maybeSingle();
 
+      // 2. Считаем выученные слова (из пройденных модулей)
+      int learnedCount = 0;
+      final modulesData = await _supabase
+          .from('flashcard_modules')
+          .select('id, flashcards(is_learned)')
+          .eq('user_id', user.id); // Берем только модули этого юзера
+
+      for (var m in modulesData) {
+        final cards = m['flashcards'] as List<dynamic>? ?? [];
+        // Плюсуем только те карточки, которые помечены как изученные
+        learnedCount += cards.where((c) => c['is_learned'] == true).length;
+      }
+
       setState(() {
         _profile = data;
+        _wordsLearned = learnedCount; // Сохраняем подсчитанную сумму
         _isLoading = false;
       });
     } catch (e) {
@@ -61,9 +79,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = _profile?['first_name'] ?? 'Имя пользователя';
     final level = _profile?['language_level'] ?? 'A1';
     final streak = _profile?['streak_days'] ?? 0;
-    // Пока мокаем эти две цифры
-    final wordsLearned = 1240;
-    final lessonsCompleted = 5;
+
+    // Передаем реальное значение выученных слов
+    final wordsLearned = _wordsLearned;
+    final lessonsCompleted = 5; // Пока оставляем моком (доделаем когда будут уроки)
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -184,7 +203,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Настройки и прочее
               _buildListTile('Настройки', Icons.settings_outlined, onTap: () async {
-                // Идем в настройки и ждем возврата, чтобы обновить профиль
                 await context.push('/settings');
                 _loadProfile();
               }),

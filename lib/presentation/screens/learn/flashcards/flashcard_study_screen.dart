@@ -20,6 +20,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
 
   int _currentIndex = 0;
   bool _isFlipped = false;
+  bool _progressSaved = false; // Рухсари
 
   // Настройки
   bool _shuffle = false;
@@ -77,6 +78,7 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
 
       _currentIndex = 0;
       _isFlipped = false;
+      _progressSaved = false; //рухсари
       _unknownCardsToRepeat.clear();
       _dragOffset = Offset.zero;
       _dragAngle = 0.0;
@@ -124,7 +126,25 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
       _dragAngle = 0.0;
       _isFlipped = false;
       _currentIndex++;
+
+      // <-- ДОБАВИТЬ ЭТОТ БЛОК: Рухсари
+      // Если дошли до конца, нет ошибок и еще не сохраняли
+      if (_currentIndex >= _activeCards.length && _unknownCount == 0 && !_progressSaved) {
+        _saveModuleProgress();
+      }
     });
+  }
+  //Рухсари
+  Future<void> _saveModuleProgress() async {
+    _progressSaved = true;
+    try {
+      await Supabase.instance.client
+          .from('flashcards')
+          .update({'is_learned': true})
+          .eq('module_id', widget.moduleId);
+    } catch (e) {
+      debugPrint('Ошибка сохранения прогресса модуля: $e');
+    }
   }
 
   void _undoSwipe() {
