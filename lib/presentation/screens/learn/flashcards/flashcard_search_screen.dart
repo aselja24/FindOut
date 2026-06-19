@@ -36,7 +36,8 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     super.dispose();
   }
 
-  // Загрузка папок текущего пользователя
+  // --- ЗАГРУЗКА ДАННЫХ И ПОИСК ---
+
   Future<void> _loadUserFolders() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
@@ -48,13 +49,16 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      if (mounted) setState(() => _userFolders = List<Map<String, dynamic>>.from(res));
+      if (mounted) {
+        setState(() {
+          _userFolders = List<Map<String, dynamic>>.from(res);
+        });
+      }
     } catch (e) {
       debugPrint('Ошибка загрузки папок: $e');
     }
   }
 
-  // Поиск модулей
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) {
       setState(() {
@@ -69,24 +73,27 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     try {
       final res = await Supabase.instance.client
           .from('flashcard_modules')
-          .select('*, profiles!inner(first_name, avatar_url), flashcards(id)')
+          .select('*, profiles(first_name, avatar_url), flashcards(id)')
+          .eq('is_public', true) // Ищем только публичные
           .ilike('title', '%${query.trim()}%')
           .limit(10);
 
-      final parsed = (res as List<dynamic>).map((m) {
+      final parsed = (res as List<dynamic>).map<Map<String, dynamic>>((m) {
+        final map = m as Map<String, dynamic>;
+
         Color moduleColor = AppColors.accentLight;
-        final colorStr = m['color'] as String?;
+        final colorStr = map['color'] as String?;
         if (colorStr != null && colorStr.startsWith('0x')) {
           moduleColor = Color(int.tryParse(colorStr) ?? 0xFFDBF494);
         }
 
-        final profile = m['profiles'] as Map<String, dynamic>?;
-        final cards = m['flashcards'] as List<dynamic>? ?? [];
+        final profile = map['profiles'] as Map<String, dynamic>?;
+        final cards = map['flashcards'] as List<dynamic>? ?? [];
 
         return {
-          'id': m['id'],
-          'user_id': m['user_id'], // <--- Сохраняем ID владельца модуля
-          'title': m['title'],
+          'id': map['id'],
+          'user_id': map['user_id'],
+          'title': map['title'],
           'total': cards.length,
           'authorName': profile?['first_name'] ?? 'Аноним',
           'authorAvatar': profile?['avatar_url'],
@@ -105,6 +112,71 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  // --- ЛОГИКА СКАЧИВАНИЯ (КЛОНИРОВАНИЯ) МОДУЛЯ ---
+
+  Future<void> _downloadModule(Map<String, dynamic> module, {int? targetFolderId}) async {
+    setState(() => _isLoading = true);
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final colorHex = '0x${(module['color'] as Color).value.toRadixString(16).toUpperCase()}';
+
+      // 1. Создаем копию модуля для себя
+      final newModuleRes = await Supabase.instance.client.from('flashcard_modules').insert({
+        'user_id': userId,
+        'title': module['title'],
+        'color': colorHex,
+        'is_public': false, // Скачанный модуль по умолчанию приватный
+        'original_module_id': module['id'],
+        if (targetFolderId != null) 'folder_id': targetFolderId, // Если скачиваем сразу в папку
+      }).select('id').single();
+
+      final newModuleId = newModuleRes['id'];
+
+      // 2. Копируем все карточки этого модуля
+      final cardsRes = await Supabase.instance.client
+          .from('flashcards')
+          .select()
+          .eq('module_id', module['id']);
+
+      final originalCards = cardsRes as List<dynamic>;
+      if (originalCards.isNotEmpty) {
+        // ИСПРАВЛЕНИЕ: Добавлена строгая типизация Map<String, dynamic> и проверка полей
+        final cardsToInsert = originalCards.map<Map<String, dynamic>>((c) {
+          final map = c as Map<String, dynamic>;
+          return {
+            'module_id': newModuleId,
+            'word': map['word'],
+            'translation': map['translation'],
+            'is_learned': false,
+            if (map.containsKey('image_url')) 'image_url': map['image_url'],
+            if (map.containsKey('example')) 'example': map['example'],
+          };
+        }).toList();
+
+        await Supabase.instance.client.from('flashcards').insert(cardsToInsert);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Модуль успешно скачан!', style: TextStyle(fontFamily: 'Poppins')))
+        );
+      }
+    } catch (e) {
+      debugPrint('Ошибка скачивания: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ошибка при скачивании модуля', style: TextStyle(fontFamily: 'Poppins')))
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- ИНТЕРФЕЙС ---
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +213,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context), // Возврат на предыдущий экран
+                    onTap: () => Navigator.pop(context), // Возврат
                     child: Container(
                       height: 46,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -190,7 +262,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                             moduleId: item['id'],
                             title: item['title'],
                             color: item['color'],
-                            isOwned: isOwned, // Передаем статус владения на экран просмотра
+                            isOwned: isOwned,
                           ),
                         ),
                       );
@@ -211,7 +283,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   // ==========================================
 
   void _showModuleOptionsSheet(Map<String, dynamic> module) {
-    // Проверяем, является ли текущий пользователь владельцем модуля
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     final bool isOwned = module['user_id'] == currentUserId;
 
@@ -228,10 +299,9 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 24),
 
-            // Если мы владельцы — показываем "Редактировать модуль"
             if (isOwned) ...[
               _buildSheetActionRow(Icons.edit_outlined, 'Редактировать модуль', () {
-                Navigator.pop(ctx); // Закрываем меню
+                Navigator.pop(ctx);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -242,7 +312,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                     ),
                   ),
                 ).then((updated) {
-                  // Обновляем результаты поиска, если мы что-то изменили
                   if (updated == true) _performSearch(_searchCtrl.text);
                 });
               }),
@@ -251,9 +320,10 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
 
             _buildSheetActionRow(Icons.create_new_folder_outlined, 'Добавить в папку', () {
               Navigator.pop(ctx);
-              _showAddToFolderSheet(module['id']);
+              _showAddToFolderSheet(module); // ПЕРЕДАЕМ ВЕСЬ МОДУЛЬ, А НЕ ТОЛЬКО ID
             }),
             const SizedBox(height: 18),
+
             _buildSheetActionRow(Icons.visibility_outlined, 'Изучить', () {
               Navigator.pop(ctx);
               Navigator.push(
@@ -265,14 +335,19 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
             }),
             const SizedBox(height: 18),
 
-            // Если мы владельцы — показываем "Удалить", иначе "Скачать"
             if (isOwned)
-              _buildSheetActionRow(Icons.delete_outline, 'Удалить', () {
-                // TODO: Логика удаления модуля
+              _buildSheetActionRow(Icons.delete_outline, 'Удалить', () async {
                 Navigator.pop(ctx);
+                try {
+                  await Supabase.instance.client.from('flashcard_modules').delete().eq('id', module['id']);
+                  _performSearch(_searchCtrl.text);
+                } catch(e) {}
               })
             else
-              _buildSheetActionRow(Icons.file_download_outlined, 'Скачать', () => Navigator.pop(ctx)),
+              _buildSheetActionRow(Icons.file_download_outlined, 'Скачать', () {
+                Navigator.pop(ctx);
+                _downloadModule(module); // ВЫЗЫВАЕМ СКАЧИВАНИЕ
+              }),
           ],
         ),
       ),
@@ -293,8 +368,8 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   }
 
   // 2. Меню выбора папки
-  void _showAddToFolderSheet(int moduleId) {
-    int? selectedFolderId; // Локальный стейт для выбора папки
+  void _showAddToFolderSheet(Map<String, dynamic> module) {
+    int? selectedFolderId;
 
     showModalBottomSheet(
       context: context,
@@ -317,7 +392,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                   GestureDetector(
                     onTap: () {
                       Navigator.pop(ctx);
-                      _showCreateFolderSheet();
+                      _showCreateFolderSheet(module);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -338,10 +413,26 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           setModalState(() => selectedFolderId = folder['id']);
-                          // TODO: Добавить логику привязки модуля к папке в БД
-                          Future.delayed(const Duration(milliseconds: 300), () => Navigator.pop(ctx));
+
+                          final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                          final bool isOwned = module['user_id'] == currentUserId;
+
+                          if (isOwned) {
+                            // Если модуль наш, просто обновляем его folder_id
+                            try {
+                              await Supabase.instance.client.from('flashcard_modules').update({'folder_id': folder['id']}).eq('id', module['id']);
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Добавлено в папку!')));
+                            } catch(e) {}
+                          } else {
+                            // Если модуль чужой, сначала скачиваем его, и кладем в папку
+                            await _downloadModule(module, targetFolderId: folder['id']);
+                          }
+
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            if (mounted) Navigator.pop(ctx);
+                          });
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -351,11 +442,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                                color: AppColors.textPrimary,
-                                size: 20,
-                              ),
+                              Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: AppColors.textPrimary, size: 20),
                               const SizedBox(width: 12),
                               Text(folder['name'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                             ],
@@ -373,13 +460,13 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   }
 
   // 3. Меню создания новой папки
-  void _showCreateFolderSheet() {
+  void _showCreateFolderSheet(Map<String, dynamic> moduleToLink) {
     final folderCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
-      isScrollControlled: true, // Чтобы не перекрывало клавиатурой
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
@@ -414,8 +501,34 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   if (folderCtrl.text.trim().isEmpty) return;
-                  // TODO: Сохранить в БД и обновить _userFolders
-                  Navigator.pop(ctx);
+
+                  try {
+                    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+                    // 1. Создаем папку в БД
+                    final res = await Supabase.instance.client.from('flashcard_folders').insert({
+                      'user_id': userId,
+                      'name': folderCtrl.text.trim(),
+                    }).select().single();
+
+                    setState(() {
+                      // ИСПРАВЛЕНИЕ: Добавлено приведение типа
+                      _userFolders.insert(0, res as Map<String, dynamic>);
+                    });
+
+                    // 2. Сразу привязываем к ней модуль!
+                    final bool isOwned = moduleToLink['user_id'] == userId;
+                    if (isOwned) {
+                      await Supabase.instance.client.from('flashcard_modules').update({'folder_id': res['id']}).eq('id', moduleToLink['id']);
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Папка создана, модуль добавлен!')));
+                    } else {
+                      await _downloadModule(moduleToLink, targetFolderId: res['id']);
+                    }
+
+                    if (mounted) Navigator.pop(ctx);
+                  } catch (e) {
+                    debugPrint('Ошибка создания папки: $e');
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
