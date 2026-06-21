@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import 'reading_test_screen.dart';
 
 class ReadingDetailScreen extends StatelessWidget {
   final Map<String, dynamic> article;
+  final bool isFromLessonFlow; // <-- ДОБАВЛЕН ФЛАГ
 
-  const ReadingDetailScreen({super.key, required this.article});
+  const ReadingDetailScreen({
+    super.key,
+    required this.article,
+    this.isFromLessonFlow = false, // По умолчанию false
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +47,7 @@ class ReadingDetailScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          Container(height: 4, width: double.infinity, color: const Color(0xFFFF9D66)), // Оранжевая линия
+          Container(height: 4, width: double.infinity, color: const Color(0xFFFF9D66)),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -75,14 +81,23 @@ class ReadingDetailScreen extends StatelessWidget {
               ),
             ),
           ),
-          // Нижние кнопки
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => context.push('/reading/test', extra: article['id']),
+                    onPressed: () {
+                      // ИСПРАВЛЕНО: Умная проверка пути
+                      if (isFromLessonFlow) {
+                        Navigator.pop(context, true);
+                      } else {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => ReadingTestScreen(articleId: article['id'])),
+                        );
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF7B4DFE),
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -95,7 +110,7 @@ class ReadingDetailScreen extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {}, // Логика добавления в карточки
+                    onPressed: () {},
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC3F336),
                       padding: const EdgeInsets.symmetric(vertical: 16),

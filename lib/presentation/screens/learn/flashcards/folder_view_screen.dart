@@ -375,12 +375,11 @@ class _AddMaterialsSheetState extends State<AddMaterialsSheet> {
     if (userId == null) return;
 
     try {
-      // Ищем наши модули, которые ЕЩЕ НЕ в этой папке
       final res = await Supabase.instance.client
           .from('flashcard_modules')
           .select('*, flashcards(id)')
           .eq('user_id', userId)
-          .isFilter('folder_id', null) // Предполагаем, что они нигде не лежат. Если могут лежать в других, то .neq('folder_id', widget.folderId)
+          .isFilter('folder_id', null)
           .order('created_at', ascending: false);
 
       final parsed = (res as List<dynamic>).map<Map<String, dynamic>>((m) {

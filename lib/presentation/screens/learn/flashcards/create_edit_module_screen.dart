@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import 'module_settings_screen.dart';
 
 class CreateEditModuleScreen extends StatefulWidget {
-  final int? moduleId; // Если null -> Создание, иначе -> Редактирование
+  final int? moduleId;
   final String? initialTitle;
   final Color? initialColor;
   final int? targetFolderId;
@@ -66,7 +66,6 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
     super.dispose();
   }
 
-  // --- ЛОГИКА КАРТОЧЕК ---
 
   void _addNewCard({String term = '', String def = ''}) {
     setState(() {
@@ -77,7 +76,6 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
     });
   }
 
-  // --- ЛОГИКА БД И СОХРАНЕНИЯ ---
 
   Future<void> _loadExistingCards() async {
     setState(() => _isLoading = true);

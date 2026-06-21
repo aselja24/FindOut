@@ -19,10 +19,22 @@ class _ReadingScreenState extends State<ReadingScreen> {
   final List<String> _categories = ['Все', 'Культура', 'Места', 'Традиции', 'История', 'Кухня'];
   String _selectedCategory = 'Все';
 
+  // --- ДОБАВЛЕНО: Переменные для фильтра уровней ---
+  String _selectedLevel = 'A1-A2';
+  final List<String> _levels = ['A1-A2', 'B1-B2', 'C1-C2'];
+
   @override
   void initState() {
     super.initState();
     _fetchArticlesAndProgress();
+  }
+
+  // --- ДОБАВЛЕНО: Динамический цвет для кнопок уровней ---
+  Color _getLevelColor(String level) {
+    if (level.contains('A1') || level.contains('A2')) return const Color(0xFFC3F336);
+    if (level.contains('B1') || level.contains('B2')) return const Color(0xFFFF9DE6);
+    if (level.contains('C1') || level.contains('C2')) return const Color(0xFF4D96FF);
+    return const Color(0xFFEEEEEE);
   }
 
   Future<void> _fetchArticlesAndProgress() async {
@@ -131,6 +143,15 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- ДОБАВЛЕНО: Локальная фильтрация статей по выбранному уровню ---
+    final filteredArticles = _articles.where((article) {
+      final String lvl = article['level_restriction'] ?? '';
+      if (_selectedLevel == 'A1-A2') return lvl == 'A1' || lvl == 'A2' || lvl == 'A1-A2';
+      if (_selectedLevel == 'B1-B2') return lvl == 'B1' || lvl == 'B2' || lvl == 'B1-B2';
+      if (_selectedLevel == 'C1-C2') return lvl == 'C1' || lvl == 'C2' || lvl == 'C1-C2';
+      return true;
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -156,16 +177,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                 ),
               )),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFFC3F336), borderRadius: BorderRadius.circular(20)),
-                child: const Row(
-                  children: [
-                    Text('A1-A2', style: TextStyle(fontWeight: FontWeight.w700)),
-                    Icon(Icons.keyboard_arrow_down, size: 16),
-                  ],
-                ),
-              ),
+
+              // --- ИСПРАВЛЕНО: Теперь здесь рабочий выпадающий список (как в аудировании) ---
+              _buildLevelFilter(),
             ],
           ),
         ),
@@ -178,18 +192,46 @@ class _ReadingScreenState extends State<ReadingScreen> {
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _articles.isEmpty
-              ? const Center(child: Text('Статей пока нет'))
+              : filteredArticles.isEmpty
+              ? const Center(child: Text('Для этого уровня пока нет статей', style: TextStyle(fontFamily: 'Poppins')))
               : ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _articles.length,
+            itemCount: filteredArticles.length, // Используем отфильтрованный список
             itemBuilder: (context, index) {
-              final article = _articles[index];
+              final article = filteredArticles[index];
               return _buildArticleCard(article);
             },
           ),
         ),
       ],
+    );
+  }
+
+  // --- ДОБАВЛЕНО: Виджет выпадающего списка уровней ---
+  Widget _buildLevelFilter() {
+    return PopupMenuButton<String>(
+      initialValue: _selectedLevel,
+      onSelected: (value) => setState(() => _selectedLevel = value),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      offset: const Offset(0, 40),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: _getLevelColor(_selectedLevel),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Text(_selectedLevel, style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Poppins', fontSize: 13, color: Colors.black)),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.black),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => _levels.map((lvl) => PopupMenuItem(
+        value: lvl,
+        child: Text(lvl, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+      )).toList(),
     );
   }
 
@@ -245,7 +287,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             const SizedBox(height: 16),
             Text(article['title'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)), // Если захочешь сделать динамичным, замени на article['subtitle'] если он есть в БД
             const SizedBox(height: 16),
             Row(
               children: [

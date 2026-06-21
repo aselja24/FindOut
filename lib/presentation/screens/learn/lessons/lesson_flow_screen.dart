@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 
-// Импортируем экраны теории
+// Импортируем теорию
 import '../grammar/grammar_detail_screen.dart';
 import '../reading/reading_detail_screen.dart';
 
-// Импортируем экраны тестов
+// Импортируем тесты
 import '../grammar/grammar_test_screen.dart';
 import '../reading/reading_test_screen.dart';
 import '../listening/listening_test_screen.dart';
@@ -26,7 +26,6 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
   bool _isLoading = true;
   bool _isFinished = false;
 
-  // Данные для каждого этапа
   Map<String, dynamic>? _grammarData;
   Map<String, dynamic>? _readingData;
   Map<String, dynamic>? _listeningData;
@@ -37,75 +36,98 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
     _fetchLessonMaterials();
   }
 
-  // Загружаем данные обо всех частях урока из базы
   Future<void> _fetchLessonMaterials() async {
     try {
       final grammarId = widget.lessonData['grammar_id'];
       final readingId = widget.lessonData['reading_id'];
       final listeningId = widget.lessonData['listening_id'];
 
-      // Загружаем грамматику
       if (grammarId != null) {
         _grammarData = await _supabase.from('grammar_lessons').select().eq('id', grammarId).maybeSingle();
       }
-      // Загружаем статью
       if (readingId != null) {
         _readingData = await _supabase.from('culture_articles').select().eq('id', readingId).maybeSingle();
       }
-      // Загружаем тест аудирования
       if (listeningId != null) {
         _listeningData = await _supabase.from('listening_tests').select().eq('id', listeningId).maybeSingle();
       }
 
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
-      debugPrint('Ошибка загрузки материалов урока: $e');
+      debugPrint('Ошибка загрузки материалов: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- ГЛАВНАЯ ЛОГИКА: ПОСЛЕДОВАТЕЛЬНЫЙ ЗАПУСК (ТЕОРИЯ -> ПРАКТИКА) ---
   Future<void> _startLessonFlow() async {
-
-    // 1. ЭТАП: ГРАММАТИКА
+    // ==========================================
+    // 1. БЛОК: ГРАММАТИКА
+    // ==========================================
     if (_grammarData != null) {
-      // Сначала теория
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => GrammarDetailScreen(lesson: _grammarData!)));
-      if (!mounted) return;
-      // Затем тест по грамматике
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => GrammarTestScreen(lessonId: _grammarData!['id'])));
+      // 1.1 Открываем теорию с флагом isFromLessonFlow: true
+      final bool? goToGrammarTest = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => GrammarDetailScreen(lesson: _grammarData!, isFromLessonFlow: true)),
+      );
+
+      // 1.2 Если из теории пришел сигнал true, открываем тест
+      if (goToGrammarTest == true && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => GrammarTestScreen(lessonId: _grammarData!['id'])),
+        );
+      }
     }
 
     if (!mounted) return;
 
-    // 2. ЭТАП: ЧТЕНИЕ
+    // ==========================================
+    // 2. БЛОК: ЧТЕНИЕ
+    // ==========================================
     if (_readingData != null) {
-      // Сначала сама статья
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => ReadingDetailScreen(article: _readingData!)));
-      if (!mounted) return;
-      // Затем тест по чтению
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => ReadingTestScreen(articleId: _readingData!['id'])));
+      // 2.1 Открываем текст с флагом isFromLessonFlow: true
+      final bool? goToReadingTest = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => ReadingDetailScreen(article: _readingData!, isFromLessonFlow: true)),
+      );
+
+      // 2.2 Если из текста пришел сигнал true, открываем тест
+      if (goToReadingTest == true && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ReadingTestScreen(articleId: _readingData!['id'])),
+        );
+      }
     }
 
     if (!mounted) return;
 
-    // 3. ЭТАП: АУДИРОВАНИЕ (Сразу тест)
+    // ==========================================
+    // 3. БЛОК: АУДИРОВАНИЕ
+    // ==========================================
     if (_listeningData != null) {
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => ListeningTestScreen(testData: _listeningData!)));
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ListeningTestScreen(testData: _listeningData!)),
+      );
     }
 
     if (!mounted) return;
 
-    // 4. ЭТАП: ЗАВЕРШЕНИЕ УРОКА
+    // ==========================================
+    // 4. ЗАВЕРШЕНИЕ УРОКА
+    // ==========================================
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      await _supabase.from('user_progress').upsert({
-        'user_id': user.id,
-        'item_type': 'course_lesson',
-        'item_id': widget.lessonData['id'],
-        'score_percentage': 100,
-        'completed_at': DateTime.now().toIso8601String(),
-      });
+      try {
+        await _supabase.from('user_progress').upsert({
+          'user_id': user.id,
+          'item_type': 'course_lesson',
+          'item_id': widget.lessonData['id'],
+          'score_percentage': 100,
+          'completed_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {}
     }
 
     setState(() {
@@ -116,7 +138,7 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator(color: AppColors.primary)));
     }
 
     if (_isFinished) {
@@ -125,13 +147,9 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
+      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, iconTheme: const IconThemeData(color: Colors.black)),
       body: SafeArea(
-        child: SingleChildScrollView( // Добавил скролл на случай длинного списка этапов
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,22 +168,18 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
               const Text('Что внутри:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
               const SizedBox(height: 16),
 
-              // Обновленный список этапов
               if (_grammarData != null) ...[
-                _buildStepRow(Icons.menu_book_rounded, 'Грамматика (Теория)', _grammarData!['title']),
-                _buildStepRow(Icons.quiz_rounded, 'Грамматика (Практика)', 'Проверка знаний'),
+                _buildStepRow(Icons.menu_book_rounded, 'Грамматика', _grammarData!['title']),
               ],
               if (_readingData != null) ...[
-                _buildStepRow(Icons.article_rounded, 'Чтение (Статья)', _readingData!['title']),
-                _buildStepRow(Icons.quiz_rounded, 'Чтение (Практика)', 'Тест по тексту'),
+                _buildStepRow(Icons.article_rounded, 'Чтение', _readingData!['title']),
               ],
               if (_listeningData != null) ...[
-                _buildStepRow(Icons.headset_rounded, 'Слушание (Тест)', _listeningData!['title']),
+                _buildStepRow(Icons.headset_rounded, 'Слушание', _listeningData!['title']),
               ],
 
               const SizedBox(height: 40),
 
-              // Кнопка НАЧАТЬ
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -231,7 +245,9 @@ class _LessonFlowScreenState extends State<LessonFlowScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context, true);
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFC3F336),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),

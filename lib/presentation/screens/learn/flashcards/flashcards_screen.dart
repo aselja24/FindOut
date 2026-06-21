@@ -273,7 +273,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               ],
             ),
           ),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.volume_up_rounded, color: AppColors.textPrimary, size: 24), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
         ],
       ),
     );

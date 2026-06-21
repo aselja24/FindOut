@@ -313,16 +313,6 @@ class _FlashcardStudyScreenState extends State<FlashcardStudyScreen> {
           Positioned(left: -20, top: -20, child: CircleAvatar(radius: 60, backgroundColor: Colors.white.withOpacity(0.15))),
           Positioned(right: -40, bottom: -40, child: CircleAvatar(radius: 80, backgroundColor: Colors.white.withOpacity(0.1))),
 
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (_tts) const Icon(Icons.volume_up_rounded, color: AppColors.textPrimary, size: 26) else const SizedBox(),
-              ],
-            ),
-          ),
-
           Center(
             child: Text(
               textToShow,
