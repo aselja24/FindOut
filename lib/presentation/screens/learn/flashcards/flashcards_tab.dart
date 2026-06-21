@@ -209,7 +209,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                           const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
-                            height: 38,
+                            height: 44, // ИСПРАВЛЕНИЕ: Увеличили высоту для кнопки
                             child: ElevatedButton(
                               onPressed: () {
                                 Navigator.push(
@@ -222,12 +222,13 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                                 ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ ПРОГРЕССА
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.4),
+                                backgroundColor: Colors.white.withOpacity(0.5), // Сделал чуть плотнее
                                 foregroundColor: AppColors.textPrimary,
                                 elevation: 0,
+                                padding: EdgeInsets.zero, // ИСПРАВЛЕНИЕ: Убрали внутренние отступы, которые съедали текст
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              child: const Text('Продолжить', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                              child: const Text('Продолжить', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                             ),
                           )
                         ],

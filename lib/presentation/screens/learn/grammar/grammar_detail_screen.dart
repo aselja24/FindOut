@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import 'grammar_test_screen.dart';
 
 class GrammarDetailScreen extends StatelessWidget {
   final Map<String, dynamic> lesson;
+  final bool isFromLessonFlow; // <-- ДОБАВЛЕН ФЛАГ
 
-  const GrammarDetailScreen({super.key, required this.lesson});
+  const GrammarDetailScreen({
+    super.key,
+    required this.lesson,
+    this.isFromLessonFlow = false, // По умолчанию false
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -84,9 +90,17 @@ class GrammarDetailScreen extends StatelessWidget {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  // Достаем id урока (убедись, что ключ совпадает с тем, как он приходит из БД)
                   final int lessonId = lesson['id'] as int;
-                  context.push('/grammar/test', extra: lessonId);
+
+                  // ИСПРАВЛЕНО: Умная проверка пути
+                  if (isFromLessonFlow) {
+                    Navigator.pop(context, true); // Если из Урока - возвращаем сигнал
+                  } else {
+                    Navigator.pushReplacement(    // Если из Библиотеки - открываем тест напрямую
+                      context,
+                      MaterialPageRoute(builder: (_) => GrammarTestScreen(lessonId: lessonId)),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
