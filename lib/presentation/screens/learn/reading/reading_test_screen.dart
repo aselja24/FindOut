@@ -507,7 +507,6 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
     );
   }
 
-  // ─── RESULT ──────────────────────────────────────────────────────────────
   Widget _buildResultContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -557,7 +556,7 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withOpacity(0.08), // Замени на .withValues(alpha: 0.08) если Flutter ругается
                               blurRadius: 10,
                             ),
                           ],
@@ -595,7 +594,8 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                   text: 'Далее',
                   color: _orange,
                   textColor: Colors.black,
-                  onPressed: () => context.pop(),
+                  // ИСПРАВЛЕНО: Передаем true (тест успешно завершен)
+                  onPressed: () => Navigator.pop(context, true),
                 ),
               ),
               const SizedBox(height: 16),
@@ -606,7 +606,8 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                       text: 'Вернуться к статье',
                       color: _pink,
                       textColor: Colors.black,
-                      onPressed: () => context.pop(),
+                      // ИСПРАВЛЕНО: Передаем false (просто закрыть тест, остаться на статье)
+                      onPressed: () => Navigator.pop(context, false),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -631,7 +632,7 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
     );
   }
 
-  // ─── REVIEW ──────────────────────────────────────────────────────────────
+// ─── REVIEW ──────────────────────────────────────────────────────────────
   Widget _buildReviewContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,7 +720,8 @@ class _ReadingTestScreenState extends State<ReadingTestScreen> {
                         text: 'Продолжить обучение',
                         color: _orange,
                         textColor: Colors.black,
-                        onPressed: () => context.pop(),
+                        // ИСПРАВЛЕНО: Передаем true (тест успешно завершен)
+                        onPressed: () => Navigator.pop(context, true),
                       ),
                     ),
                     const SizedBox(height: 32),

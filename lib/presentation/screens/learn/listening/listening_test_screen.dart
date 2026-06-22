@@ -24,7 +24,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
 
   final Map<int, int> _selectedAnswers = {};
   bool _showTranslation = false;
-  bool _isCurrentPartChecked = false; // Флаг: проверена ли текущая часть
+  bool _isCurrentPartChecked = false;
 
   // Статистика
   int _correctCount = 0;
@@ -147,7 +147,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
 
     for (var q in questions) {
       final String text = q['question_text'] ?? '';
-      if (text.startsWith('Beispiel:')) continue; // Пропускаем примеры
+      if (text.startsWith('Beispiel:')) continue;
 
       _totalCount++;
       final qId = q['id'];
@@ -172,7 +172,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
   }
 
   void _nextPart() {
-    if (!_isCurrentPartChecked) _checkCurrentPart(); // Авто-проверка, если забыли нажать
+    if (!_isCurrentPartChecked) _checkCurrentPart();
 
     if (_currentPartIndex < _parts.length - 1) {
       _audioPlayer.pause();
@@ -191,7 +191,6 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
     if (!_isCurrentPartChecked) _checkCurrentPart();
     _audioPlayer.pause();
 
-    // Сохранение прогресса
     final user = _supabase.auth.currentUser;
     if (user != null && _totalCount > 0) {
       try {
@@ -279,7 +278,6 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
                 const SizedBox(height: 32),
                 ...questions.map((q) => _buildQuestionBlock(q, _isCurrentPartChecked)),
 
-                // Текст аудио после проверки
                 if (_isCurrentPartChecked) ...[
                   const Divider(color: Color(0xFFEEEEEE)),
                   const SizedBox(height: 16),
@@ -381,7 +379,6 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
     );
   }
 
-  // --- БЛОК ВОПРОСА ---
   Widget _buildQuestionBlock(Map<String, dynamic> question, bool isChecking) {
     final qId = question['id'];
     final String originalText = question['question_text'] ?? '';
@@ -398,7 +395,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
       margin: const EdgeInsets.only(bottom: 32),
       padding: isExample ? const EdgeInsets.all(16) : EdgeInsets.zero,
       decoration: isExample ? BoxDecoration(
-        color: const Color(0xFFC3F336).withOpacity(0.15),
+        color: const Color(0xFFC3F336).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFC3F336), width: 1.5),
       ) : null,
@@ -435,7 +432,6 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
         if (!isChecking && !isExample) {
           if (isSelected) { borderColor = const Color(0xFF7B4DFE); textColor = const Color(0xFF7B4DFE); }
         } else {
-          // Режим проверки или пример
           if (isCorrect) {
             borderColor = const Color(0xFF8DB600); textColor = const Color(0xFF8DB600);
             if (!isExample) trailingText = 'правильный ответ';
@@ -456,7 +452,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: borderColor, width: 1.5),
-                    color: (isSelected && isExample) ? const Color(0xFF7B4DFE).withOpacity(0.1) : Colors.transparent,
+                    color: (isSelected && isExample) ? const Color(0xFF7B4DFE).withValues(alpha: 0.1) : Colors.transparent,
                   ),
                   child: Center(child: Text(options[index]['label'] ?? '', style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontFamily: 'Poppins'))),
                 ),
@@ -522,7 +518,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: color, width: 1.5),
         ),
@@ -543,10 +539,10 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
         Color bgColor = Colors.transparent;
 
         if (isChecking || isExample) {
-          if (isCorrect) { borderColor = const Color(0xFF8DB600); bgColor = const Color(0xFF8DB600).withOpacity(0.2); }
-          else if (isSelected) { borderColor = const Color(0xFFE5805E); bgColor = const Color(0xFFE5805E).withOpacity(0.2); }
+          if (isCorrect) { borderColor = const Color(0xFF8DB600); bgColor = const Color(0xFF8DB600).withValues(alpha: 0.2); }
+          else if (isSelected) { borderColor = const Color(0xFFE5805E); bgColor = const Color(0xFFE5805E).withValues(alpha: 0.2); }
         } else if (isSelected) {
-          bgColor = const Color(0xFFBCA6F6).withOpacity(0.3);
+          bgColor = const Color(0xFFBCA6F6).withValues(alpha: 0.3);
         }
 
         return GestureDetector(
@@ -579,7 +575,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,7 +653,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
                       top: 10, left: 0,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)]),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)]),
                         child: const Text('А ты крут ;)', style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Poppins', fontSize: 13)),
                       ),
                     ),
@@ -674,7 +670,8 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  // ИСПРАВЛЕНО: Передаем true (тест успешно завершен)
+                  onPressed: () => Navigator.pop(context, true),
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF9D66), padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), elevation: 0),
                   child: const Text('Далее', style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                 ),
@@ -684,7 +681,8 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      // ИСПРАВЛЕНО: Передаем false (отмена, просто вернуться назад без прохождения)
+                      onPressed: () => Navigator.pop(context, false),
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF9DE6), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), elevation: 0),
                       child: const Text('Завершить', style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                     ),
@@ -693,7 +691,7 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _wrongAnswers.isEmpty ? null : () => setState(() => _currentState = TestState.review),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC3F336), disabledBackgroundColor: const Color(0xFFC3F336).withOpacity(0.4), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), elevation: 0),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC3F336), disabledBackgroundColor: const Color(0xFFC3F336).withValues(alpha: 0.4), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), elevation: 0),
                       child: const Text('Разбор ошибок', style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                     ),
                   ),
@@ -710,7 +708,6 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
   // === 3. ЭКРАН РАЗБОРА ОШИБОК ===
 
   Widget _buildReviewContent() {
-    // Группируем ошибки по частям теста
     final Map<String, List<Map<String, dynamic>>> groupedErrors = {};
     for (var error in _wrongAnswers) {
       final partTitle = error['part_title'] as String;
@@ -750,7 +747,8 @@ class _ListeningTestScreenState extends State<ListeningTestScreen> {
 
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                // ИСПРАВЛЕНО: Передаем true, так как тест пройден и разобран
+                onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC3F336), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), elevation: 0),
                 child: const Text('Завершить', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
               ),
