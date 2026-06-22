@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../profile/profile_screen.dart';
 import 'lesson_flow_screen.dart';
 
 class LessonsScreen extends StatefulWidget {
@@ -27,12 +28,21 @@ class _LessonsScreenState extends State<LessonsScreen> {
   void initState() {
     super.initState();
     _setupProfileListener();
+    // Слушаем сигнал об обновлении (например, смены уровня на главной)
+    ProfileScreen.refreshNotifier.addListener(_onGlobalRefresh);
   }
 
   @override
   void dispose() {
     _profileSubscription?.cancel();
+    ProfileScreen.refreshNotifier.removeListener(_onGlobalRefresh);
     super.dispose();
+  }
+
+  void _onGlobalRefresh() {
+    if (mounted) {
+      _fetchUserLevelAndLessons();
+    }
   }
 
   String _mapLevelToRange(String level) {
@@ -40,6 +50,28 @@ class _LessonsScreenState extends State<LessonsScreen> {
     if (level == 'B1' || level == 'B2') return 'B1-B2';
     if (level == 'C1' || level == 'C2') return 'C1-C2';
     return 'A1-A2';
+  }
+
+  // Метод для принудительного получения уровня из профиля (если стрим задержался)
+  Future<void> _fetchUserLevelAndLessons() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final profile = await _supabase.from('profiles').select('language_level').eq('id', userId).maybeSingle();
+      if (profile != null) {
+        final rawLevel = profile['language_level'] ?? 'A1';
+        final range = _mapLevelToRange(rawLevel);
+        
+        setState(() {
+          _currentRawLevel = rawLevel;
+          _displayLevelRange = range;
+        });
+        await _fetchLessonsAndProgress();
+      }
+    } catch (e) {
+      debugPrint('Ошибка обновления уровня: $e');
+    }
   }
 
   void _setupProfileListener() {
@@ -56,11 +88,13 @@ class _LessonsScreenState extends State<LessonsScreen> {
             final range = _mapLevelToRange(rawLevel);
             
             if (rawLevel != _currentRawLevel || _lessons.isEmpty) {
-              setState(() {
-                _currentRawLevel = rawLevel;
-                _displayLevelRange = range;
-              });
-              _fetchLessonsAndProgress();
+              if (mounted) {
+                setState(() {
+                  _currentRawLevel = rawLevel;
+                  _displayLevelRange = range;
+                });
+                _fetchLessonsAndProgress();
+              }
             }
           }
         });
@@ -83,7 +117,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
           .eq('user_id', user.id)
           .eq('item_type', 'course_lesson');
 
-      final completedIds = progressData.map<int>((p) => p['item_id'] as int).toSet();
+      final completedIds = progressData.map<int>((p) => (p['item_id'] as num).toInt()).toSet();
 
       if (mounted) {
         setState(() {
@@ -92,8 +126,9 @@ class _LessonsScreenState extends State<LessonsScreen> {
 
           _maxCompletedOrder = 0;
           for (var lesson in _lessons) {
-            if (completedIds.contains(lesson['id']) && lesson['order_num'] > _maxCompletedOrder) {
-              _maxCompletedOrder = lesson['order_num'];
+            final lid = (lesson['id'] as num).toInt();
+            if (completedIds.contains(lid) && (lesson['order_num'] as num).toInt() > _maxCompletedOrder) {
+              _maxCompletedOrder = (lesson['order_num'] as num).toInt();
             }
           }
           _isLoading = false;
@@ -131,7 +166,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(color: const Color(0xFFC3F336), borderRadius: BorderRadius.circular(20)),
-                  child: Text(_displayLevelRange, style: const TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Poppins', color: Colors.black)),
+                  child: Text(_currentRawLevel, style: const TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Poppins', color: Colors.black)),
                 ),
               ],
             ),
@@ -145,7 +180,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                     children: [
                       Icon(Icons.school_outlined, size: 64, color: Colors.grey[300]),
                       const SizedBox(height: 16),
-                      Text('Для уровня $_displayLevelRange пока нет уроков.',
+                      Text('Для уровня $_currentRawLevel пока нет уроков.',
                         style: const TextStyle(fontFamily: 'Poppins', color: AppColors.textSecondary)),
                     ],
                   ),
@@ -162,8 +197,9 @@ class _LessonsScreenState extends State<LessonsScreen> {
   }
 
   Widget _buildLessonCard(Map<String, dynamic> lesson) {
-    final bool isLocked = lesson['order_num'] > _maxCompletedOrder + 1;
-    final bool isCompleted = _completedLessonIds.contains(lesson['id']);
+    final orderNum = (lesson['order_num'] as num).toInt();
+    final bool isLocked = orderNum > _maxCompletedOrder + 1;
+    final bool isCompleted = _completedLessonIds.contains((lesson['id'] as num).toInt());
 
     return GestureDetector(
       onTap: () {
@@ -208,7 +244,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                       borderRadius: BorderRadius.circular(12)
                     ),
                     child: Text(
-                      isCompleted ? 'Пройдено' : 'Урок ${lesson['order_num']}', 
+                      isCompleted ? 'Пройдено' : 'Урок $orderNum', 
                       style: TextStyle(color: isCompleted ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.w800, fontFamily: 'Poppins')
                     ),
                   ),
@@ -220,7 +256,7 @@ class _LessonsScreenState extends State<LessonsScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(lesson['title'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.black, fontFamily: 'Poppins')),
+              Text(lesson['title'] ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.black, fontFamily: 'Poppins')),
               const SizedBox(height: 8),
               Text(
                 lesson['description'] ?? 'Грамматика, Чтение и Слушание.',
