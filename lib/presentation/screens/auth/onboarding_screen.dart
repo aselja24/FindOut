@@ -25,12 +25,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _SlideData(
       imagePath: AppImages.loading2,
       title: 'Учись в своём темпе',
-      subtitle: 'Выработай привычку и сделай\nобучение частью каждого дня',
+      subtitle: '10 минут в день — и немецкий\nстанет частью твоей жизни',
     ),
     _SlideData(
       imagePath: AppImages.loading3,
-      title: 'Уроки под твой уровень',
-      subtitle: 'Разные форматы обучения —\nкарточки, грамматика, культура и игры',
+      title: 'Твой уровень — твой темп',
+      subtitle: 'Карточки, грамматика, аудирование и статьи —\nвсё в одном месте',
     ),
   ];
 
@@ -121,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           fontFamily: 'Poppins',
                         ),
                       ),
-                      child: const Text('Выбрать язык'),
+                      child: const Text('Начать'),
                     ),
                   ),
                   const SizedBox(height: 20),

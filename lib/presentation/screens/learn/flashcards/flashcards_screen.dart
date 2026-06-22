@@ -43,7 +43,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     super.dispose();
   }
 
-  // --- ЗАГРУЗКА ДАННЫХ ---
 
   Future<void> _fetchCards() async {
     try {
@@ -80,18 +79,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     }
   }
 
-  // --- ФУНКЦИОНАЛ МЕНЮ ---
 
-  // 1. Удаление своего модуля
+  //  Удаление своего модуля
   Future<void> _deleteModule() async {
     setState(() => _isLoading = true);
     try {
-      // Сначала удаляем карточки модуля (если не настроен каскадный сброс)
       await Supabase.instance.client.from('flashcards').delete().eq('module_id', widget.moduleId);
       // Затем сам модуль
       await Supabase.instance.client.from('flashcard_modules').delete().eq('id', widget.moduleId);
 
-      if (mounted) Navigator.pop(context); // Возвращаемся в библиотеку
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       debugPrint('Ошибка удаления: $e');
       setState(() => _isLoading = false);
@@ -139,7 +136,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     }
   }
 
-  // --- ИНТЕРФЕЙС ---
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +274,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
   }
 
-  // === МЕНЮ ОПЦИЙ (Редактировать, Добавить, Изучить, Удалить/Скачать) ===
 
   void _showModuleOptionsSheet() {
     showModalBottomSheet(
@@ -294,7 +289,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 24),
 
-            // Если модуль НАШ (создан нами или скачан), показываем редактирование
             if (widget.isOwned) ...[
               _buildSheetActionRow(Icons.edit_outlined, 'Редактировать модуль', () {
                 Navigator.pop(ctx);
@@ -360,7 +354,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
   }
 
-  // --- МЕНЮ ПАПОК ---
 
   void _showAddToFolderSheet() {
     int? selectedFolderId;

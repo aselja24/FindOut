@@ -1,14 +1,12 @@
 class AppConstants {
   AppConstants._();
-  static const String appName = 'FindOut';
+  static const String appName = 'INAI.kg';
   static const String appSlogan = 'Учи язык и узнавай страну';
   static const String supabaseUrl = 'https://qptiiuolrsxofcvzarqb.supabase.co';
   static const String supabaseAnonKey = 'sb_publishable_9ZEwaPFPFxGWtEN9JgdP1w_lyTdMEO5';
 
   static const List<Map<String, String>> supportedLanguages = [
     {'code': 'de', 'name': 'Немецкий', 'flag': '🇩🇪'},
-    {'code': 'en', 'name': 'Английский', 'flag': '🇬🇧'},
-    {'code': 'ko', 'name': 'Корейский', 'flag': '🇰🇷'},
   ];
 
   static const List<String> learningGoals = [

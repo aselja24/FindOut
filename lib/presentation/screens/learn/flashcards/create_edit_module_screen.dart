@@ -28,11 +28,10 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
   bool _isEditable = false;
 
   late TextEditingController _titleCtrl;
-  Color _selectedColor = const Color(0xFFFFA5D9); // По умолчанию розовый
+  Color _selectedColor = const Color(0xFFFFA5D9);
 
   final List<Map<String, TextEditingController>> _cards = [];
 
-  // Доступные цвета из макета
   final List<Color> _palette = [
     const Color(0xFFFD9E6B),
     const Color(0xFFBAA1F6),
@@ -136,7 +135,7 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
         await Supabase.instance.client.from('flashcards').delete().eq('module_id', currentModuleId);
       }
 
-      // 2. Подготавливаем карточки
+      // Подготавливаем карточки
       List<Map<String, dynamic>> cardsToInsert = [];
       for (int i = 0; i < _cards.length; i++) {
         final termText = _cards[i]['term']!.text.trim();
@@ -152,7 +151,7 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
         }
       }
 
-      // 3. Сохраняем карточки
+      //  Сохраняем карточки
       if (cardsToInsert.isNotEmpty) {
         await Supabase.instance.client.from('flashcards').insert(cardsToInsert);
       }
@@ -164,12 +163,12 @@ class _CreateEditModuleScreenState extends State<CreateEditModuleScreen> {
     }
   }
 
-  // --- ИНТЕРФЕЙС ---
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1F1), // Более светлый серый как на макете
+      backgroundColor: const Color(0xFFF1F1F1),
       body: SafeArea(
         child: Stack(
           children: [

@@ -79,14 +79,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final user = authResponse.user;
       if (user == null) throw const AuthException('Не удалось создать аккаунт.');
 
-      // 2. Синхронизируем базовые текстовые данные профиля.
-      // Названия полей изменены под твою схему таблицы: 'first_name' и 'last_name'. Поле 'email' убрано.
       await Supabase.instance.client.from('profiles').update({
         'first_name': name,
         'last_name': surname,
       }).eq('id', user.id);
 
-      // 3. Если добавлена аватарка — загружаем её в бакет 'avatars'
       if (_avatarFile != null) {
         final file = File(_avatarFile!.path);
         final fileExt = _avatarFile!.name.split('.').last;
@@ -100,7 +97,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             .from('avatars')
             .getPublicUrl(fileName);
 
-        // Обновляем ссылку на аватар в профиле
         await Supabase.instance.client
             .from('profiles')
             .update({'avatar_url': avatarUrl})
@@ -108,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       if (mounted) {
-        context.push(Routes.setupLanguage);
+        context.push(Routes.setupLevel);
       }
     } on AuthException catch (e) {
       debugPrint('AUTH ERROR: ${e.message}');

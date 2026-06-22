@@ -17,8 +17,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   bool _isLoading = false;
   List<Map<String, dynamic>> _searchResults = [];
-
-  // Папки пользователя для BottomSheet "Добавить в папку"
   List<Map<String, dynamic>> _userFolders = [];
 
   @override
@@ -36,7 +34,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     super.dispose();
   }
 
-  // --- ЗАГРУЗКА ДАННЫХ И ПОИСК ---
 
   Future<void> _loadUserFolders() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -113,14 +110,13 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     }
   }
 
-  // --- ЛОГИКА СКАЧИВАНИЯ (КЛОНИРОВАНИЯ) МОДУЛЯ ---
+  //логика скачивания
 
   Future<void> _downloadModule(Map<String, dynamic> module, {int? targetFolderId}) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
 
-      // ЗАЩИТА ОТ ДУБЛИКАТОВ: Проверяем, не скачивали ли мы его уже
       final existingRes = await Supabase.instance.client
           .from('flashcard_modules')
           .select('id')
@@ -129,7 +125,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
           .maybeSingle();
 
       if (existingRes != null) {
-        // Если модуль уже был скачан ранее, просто кладем его в новую папку (если нужно)
         if (targetFolderId != null) {
           await Supabase.instance.client
               .from('flashcard_modules')
@@ -141,14 +136,14 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
               const SnackBar(content: Text('Модуль уже есть в вашей библиотеке и добавлен в папку!', style: TextStyle(fontFamily: 'Poppins')))
           );
         }
-        return; // Прерываем функцию, чтобы не качать карточки по второму кругу
+        return; // Прерываем функцию  чтобы не качать карточки по второму кругу
       }
 
       setState(() => _isLoading = true);
 
       final colorHex = '0x${(module['color'] as Color).value.toRadixString(16).toUpperCase()}';
 
-      // 1. Создаем копию модуля для себя
+      //  Создаем копию модуля для себя
       final newModuleRes = await Supabase.instance.client.from('flashcard_modules').insert({
         'user_id': userId,
         'title': module['title'],
@@ -160,7 +155,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
 
       final newModuleId = newModuleRes['id'];
 
-      // 2. Копируем все карточки этого модуля
+      // Копируем все карточки этого модуля
       final cardsRes = await Supabase.instance.client
           .from('flashcards')
           .select()
@@ -200,7 +195,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     }
   }
 
-  // --- ИНТЕРФЕЙС ---
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +203,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Поисковая строка и кнопка Отмена
+            //  Поисковая строка и кнопка Отмена
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Row(
@@ -257,7 +251,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
               ),
             ),
 
-            // 2. Результаты поиска
+            //  Результаты поиска
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -302,9 +296,6 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     );
   }
 
-  // ==========================================
-  // BOTTOM SHEETS (Нижние меню)
-  // ==========================================
 
   void _showModuleOptionsSheet(Map<String, dynamic> module) {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
@@ -491,10 +482,10 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
     );
   }
 
-  // 3. Меню создания новой папки
+  //  Меню создания новой папки
   void _showCreateFolderSheet(Map<String, dynamic> moduleToLink) {
     final folderCtrl = TextEditingController();
-    bool isSaving = false; // Блокировка от двойного нажатия
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -538,7 +529,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                       onPressed: isSaving ? null : () async {
                         if (folderCtrl.text.trim().isEmpty) return;
 
-                        setModalState(() => isSaving = true); // БЛОКИРУЕМ КНОПКУ
+                        setModalState(() => isSaving = true);
 
                         try {
                           final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -566,7 +557,7 @@ class _FlashcardSearchScreenState extends State<FlashcardSearchScreen> {
                         } catch (e) {
                           debugPrint('Ошибка создания папки: $e');
                         } finally {
-                          if (mounted) setModalState(() => isSaving = false); // РАЗБЛОКИРУЕМ (если вдруг ошибка)
+                          if (mounted) setModalState(() => isSaving = false);
                         }
                       },
                       style: ElevatedButton.styleFrom(
