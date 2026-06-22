@@ -82,7 +82,6 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     });
   }
 
-  // === ПРИВЯЗКА К SUPABASE ===
   Future<void> _fetchData() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -148,7 +147,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
         'user_id': userId,
         'name': name.trim(),
       });
-      _fetchData(); // Обновляем список после создания
+      _fetchData();
     } catch (e) {
       debugPrint('Ошибка создания папки: $e');
     }
@@ -219,13 +218,13 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                                       moduleId: item['id'],
                                     ),
                                   ),
-                                ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ ПРОГРЕССА
+                                ).then((_) => _fetchData());
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.5), // Сделал чуть плотнее
+                                backgroundColor: Colors.white.withOpacity(0.5),
                                 foregroundColor: AppColors.textPrimary,
                                 elevation: 0,
-                                padding: EdgeInsets.zero, // ИСПРАВЛЕНИЕ: Убрали внутренние отступы, которые съедали текст
+                                padding: EdgeInsets.zero,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                               child: const Text('Продолжить', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
@@ -302,6 +301,8 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     );
   }
 
+
+//Поисковик
   Widget _buildSearchAndCreateRow() {
     return Row(
       children: [
@@ -311,7 +312,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FlashcardSearchScreen()),
-              ).then((_) => _fetchData()); // <-- АВТООБНОВЛЕНИЕ ПРИ ВОЗВРАТЕ ИЗ ПОИСКА (Если скачали модуль)
+              ).then((_) => _fetchData());
             },
             child: Container(
               height: 46,

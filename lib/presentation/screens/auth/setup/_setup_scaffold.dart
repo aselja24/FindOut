@@ -43,7 +43,7 @@ class SetupScaffold extends StatelessWidget {
         title: Text(
           'Выполнено $step/$total',
           style: const TextStyle(
-            fontFamily: 'Nunito',
+            fontFamily: 'Poppins',
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
@@ -62,7 +62,7 @@ class SetupScaffold extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontFamily: 'Nunito',
+                        fontFamily: 'Poppins',
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -107,7 +107,7 @@ class SetupScaffold extends StatelessWidget {
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
                         child: Text('или',
-                            style: TextStyle(fontFamily: 'Nunito', fontSize: 13,
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
                                 color: AppColors.textMuted)),
                       ),
                       const Expanded(child: Divider()),

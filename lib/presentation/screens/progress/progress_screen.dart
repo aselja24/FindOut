@@ -17,7 +17,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   bool _isLoading = true;
 
-  // Статистика (согласовано с ProfileScreen)
+  // Статистика
   int _wordsLearned = 0;         
   int _lessonsCompleted = 0;     
   int _allActivities = 0;        

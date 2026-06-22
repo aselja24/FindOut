@@ -54,14 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Illustration area
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
                     const SizedBox(height: 24),
-                    // Illustration placeholder ИСПРАВЛЕНО: добавлена фотка assets/images/auth/login1.png
                     Image.asset(
                       'assets/images/auth/login1.png',
                       height: 280,
@@ -114,7 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            // Bottom buttons
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Column(

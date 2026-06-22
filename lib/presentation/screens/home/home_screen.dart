@@ -6,7 +6,6 @@ import '../learn/flashcards/flashcards_tab.dart';
 import '../learn/reading/reading_screen.dart';
 import '../learn/listening/listening_screen.dart';
 import '../progress/progress_screen.dart';
-
 import '../learn/grammar/grammar_detail_screen.dart';
 import '../learn/reading/reading_detail_screen.dart';
 import '../learn/listening/listening_test_screen.dart';
@@ -579,7 +578,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
                 child: const Text('Слово дня', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
               ),
-              const Icon(Icons.volume_up_rounded, color: Colors.white, size: 22),
             ],
           ),
           const SizedBox(height: 16),

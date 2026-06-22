@@ -13,7 +13,7 @@ class GrammarScreen extends StatefulWidget {
 
 class _GrammarScreenState extends State<GrammarScreen> {
   final _supabase = Supabase.instance.client;
-  final TextEditingController _searchCtrl = TextEditingController();
+  final TextEditingController _searchCtrl = TextEditingController(); //следит за тем что пользователь вводит в поле поиска
 
   List<Map<String, dynamic>> _allLessons = [];
   List<Map<String, dynamic>> _filteredLessons = [];

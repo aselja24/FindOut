@@ -16,7 +16,6 @@ class _LevelTestScreenState extends State<LevelTestScreen> {
   String? _selected;
   bool _showResult = false;
 
-  // Sample questions
   final _questions = [
     {'q': 'Как будет "Hello" на немецком?', 'opts': ['Auf Wiedersehen', 'Hallo', 'Danke', 'Bitte'], 'ans': 'Hallo'},
     {'q': 'Что означает "감사합니다"?', 'opts': ['Привет', 'До свидания', 'Спасибо', 'Пожалуйста'], 'ans': 'Спасибо'},

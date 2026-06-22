@@ -49,6 +49,7 @@ flutter:
     - assets/images/grammer/
     - assets/images/reading/
     - assets/images/flash/
+    - assets/icons/
   fonts:
     - family: Poppins
       fonts:

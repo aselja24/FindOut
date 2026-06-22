@@ -22,7 +22,7 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
   bool _isLoading = true;
   late String _folderName;
   List<Map<String, dynamic>> _modules = [];
-  String _sortOption = 'Недавние'; // Недавние, Дата добавления, Названию
+  String _sortOption = 'Недавние';
 
   @override
   void initState() {
@@ -31,7 +31,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
     _fetchFolderModules();
   }
 
-  // --- ЗАГРУЗКА И СОРТИРОВКА ---
 
   Future<void> _fetchFolderModules() async {
     setState(() => _isLoading = true);
@@ -238,7 +237,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
         decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(16)),
         child: Row(
           children: [
-            // Иконка модуля
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(
@@ -250,7 +248,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
             ),
             const SizedBox(width: 16),
 
-            // Тексты
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +259,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
               ),
             ),
 
-            // Кнопка удаления из папки
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded, color: AppColors.primary),
               onPressed: () => _removeModuleFromFolder(module['id']),
@@ -273,7 +269,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
     );
   }
 
-  // --- МЕНЮ ПАПКИ ---
 
   void _showFolderMenu() {
     showModalBottomSheet(
@@ -322,7 +317,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
     );
   }
 
-  // --- ДОБАВЛЕНИЕ МАТЕРИАЛОВ ---
 
   void _showAddMaterialsSheet() {
     showModalBottomSheet(
@@ -338,7 +332,6 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
   }
 }
 
-// === ВИДЖЕТ BOTTOM SHEET ДЛЯ ДОБАВЛЕНИЯ МАТЕРИАЛОВ ===
 class AddMaterialsSheet extends StatefulWidget {
   final int folderId;
   final VoidCallback onMaterialsAdded;
@@ -505,7 +498,6 @@ class _AddMaterialsSheetState extends State<AddMaterialsSheet> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      // ПЕРЕДАЕМ ID ПАПКИ в форму создания!
                       builder: (_) => CreateEditModuleScreen(targetFolderId: widget.folderId),
                     ),
                   ).then((_) {
@@ -519,7 +511,7 @@ class _AddMaterialsSheetState extends State<AddMaterialsSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Поиск в самом низу (по макету)
+            // Поиск в самом низу
             Container(
               height: 52,
               decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(26)),
