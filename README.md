@@ -11,20 +11,6 @@
 ```bash
 flutter pub get
 ```
-
-### 2. Настройка Supabase
-Открой `lib/core/constants/app_constants.dart` и замени:
-```dart
-static const String supabaseUrl = 'YOUR_SUPABASE_URL';
-static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
-```
-На реальные значения из Supabase Dashboard → Settings → API.
-
-### 3. Запуск
-```bash
-   flutter run
-```
-
 ---
 
 ## Архитектура проекта
