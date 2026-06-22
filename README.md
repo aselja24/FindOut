@@ -1,7 +1,7 @@
 # Приложение для изучения языков
 
 **Разработчики:** Асель & Рухсари  
-**Стек:** Flutter + Dart + Supabase + Hive
+**Стек:** Flutter + Dart + Supabase 
 
 ---
 
@@ -37,14 +37,13 @@ lib/
 │   └── theme/          # Цвета, шрифты, темы
 ├── domain/
 │   └── entities/       # Модели данных
-├── data/               # Репозитории, datasources
 ├── presentation/
 │   ├── screens/        # Все экраны
 │   │   ├── auth/       # Splash, Onboarding, Login, Register, Setup, LevelTest
 │   │   ├── home/       # Dashboard + Bottom Nav
 │   │   ├── learn/      # Карточки, Словарь, Грамматика, Игры
 │   │   ├── culture/    # Культура и история
-│   │   ├── progress/   # Статистика и ачивки
+│   │   ├── progress/   # Статистика 
 │   │   ├── community/  # Сообщество
 │   │   └── profile/    # Профиль и настройки
 │   ├── blocs/          # BLoC state management
@@ -65,9 +64,6 @@ lib/
 | `words` | Словарь |
 | `grammar_topics` | Темы грамматики |
 | `culture_articles` | Статьи культуры |
-| `phrases` | Разговорник |
-| `posts` | Посты сообщества |
-| `achievements` | Ачивки |
 | `user_progress` | Прогресс пользователя |
 
 ### Storage Buckets
@@ -86,7 +82,6 @@ lib/
 
 **Шрифт:** Poppins (Regular, Medium, Bold)
 
-**Поддержка:** Светлая и тёмная тема
 
 ---
 
@@ -105,10 +100,7 @@ lib/
 - Карточки + создание
 - Словарь
 - Грамматика
-- Мини-игры (3 игры)
-- Культура (5 вкладок)
 - Прогресс + Ачивки
-- Сообщество + Чат + Лидеры
 - Профиль + Настройки
 
 ---
