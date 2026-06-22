@@ -20,6 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String _email = '';
   int _wordsLearned = 0;
+  int _lessonsCompleted = 0;
 
   final Color _purple = const Color(0xFF7B4DFE);
   final Color _green = const Color(0xFFC3F336);
@@ -57,19 +58,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .eq('id', user.id)
           .maybeSingle();
 
-      // 2. Подсчет выученных слов
-      int learnedCount = 0;
+      // 2. Подсчет выученных слов (из всех модулей пользователя)
       final modulesData = await _supabase
           .from('flashcard_modules')
           .select('id, flashcards(is_learned)')
           .eq('user_id', user.id);
 
+      int learnedCount = 0;
       for (var m in modulesData) {
         final cards = m['flashcards'] as List<dynamic>? ?? [];
         learnedCount += cards.where((c) => c['is_learned'] == true).length;
       }
 
-      // 3. Загрузка избранных статей
+      // 3. Загрузка избранных статей и прогресса
       final favData = await _supabase
           .from('favorite_articles')
           .select('culture_articles(*)')
@@ -77,17 +78,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final progressData = await _supabase
           .from('user_progress')
-          .select('item_id, score_percentage')
-          .eq('user_id', user.id)
-          .eq('item_type', 'reading_test');
+          .select()
+          .eq('user_id', user.id);
+
+      // Считаем пройденные комплексные уроки (item_type = course_lesson, уникальные)
+      final Set<int> uniqueCompletedLessons = {};
+      for (var p in progressData) {
+        if (p['item_type'] == 'course_lesson' && (p['score_percentage'] ?? 0) >= 60) {
+          uniqueCompletedLessons.add((p['item_id'] as num).toInt());
+        }
+      }
 
       List<Map<String, dynamic>> favArticles = [];
       for (var f in favData) {
         final article = f['culture_articles'];
         if (article != null) {
           final prog = progressData.firstWhere(
-                  (p) => p['item_id'] == article['id'],
-              orElse: () => {}
+            (p) => p['item_id'] == article['id'] && (p['item_type'] == 'reading_test' || p['item_type'] == 'culture_article'),
+            orElse: () => {},
           );
           final int percent = prog.isNotEmpty ? (prog['score_percentage'] ?? 0) as int : 0;
 
@@ -101,12 +109,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profile = data;
         _wordsLearned = learnedCount;
+        _lessonsCompleted = uniqueCompletedLessons.length;
         _favoriteArticles = favArticles;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Ошибка загрузки профиля: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -115,7 +124,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) context.go('/login');
   }
 
-  // --- ИСПРАВЛЕНО: Форматирование уровня как на макете ---
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Удаление аккаунта', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+        content: const Text('Вы уверены? Это действие необратимо. Все ваши данные (прогресс, слова, статьи) будут удалены навсегда.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        final userId = _supabase.auth.currentUser?.id;
+        if (userId != null) {
+          try {
+            await _supabase.rpc('delete_user');
+          } catch (rpcError) {
+            debugPrint('RPC delete_user failed: $rpcError');
+            await _supabase.from('profiles').delete().eq('id', userId);
+          }
+          await _supabase.auth.signOut();
+          if (mounted) {
+            context.go('/login');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Ваш аккаунт был успешно удален.'))
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Ошибка при удалении аккаунта: $e');
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Не удалось удалить аккаунт: $e'))
+          );
+        }
+      }
+    }
+  }
+
   String _getLevelLabel(String lvl) {
     if (lvl.contains('A1') || lvl.contains('A2')) return 'Начинающий - $lvl';
     if (lvl.contains('B1') || lvl.contains('B2')) return 'Средний - $lvl';
@@ -132,13 +191,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = _profile?['first_name'] ?? 'Имя пользователя';
     final rawLevel = _profile?['language_level'] ?? 'A1';
     final streak = _profile?['streak_days'] ?? 0;
-
-    // ИСПРАВЛЕНО: Достаем ссылку на аватар
     final avatarUrl = _profile?['avatar_url'];
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-
-    final wordsLearned = _wordsLearned;
-    final lessonsCompleted = 5;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -164,7 +218,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                  // ИСПРАВЛЕНО: Теперь фото берется из базы
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: _purple,
@@ -179,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(_getLevelLabel(rawLevel), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-                  const Text('28%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                  const Text('Прогресс', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Colors.grey)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -188,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(height: 8, decoration: BoxDecoration(color: const Color(0xFFEEEEEE), borderRadius: BorderRadius.circular(4))),
                   LayoutBuilder(
                     builder: (context, constraints) => Container(
-                      width: constraints.maxWidth * 0.28,
+                      width: constraints.maxWidth * 0.3,
                       height: 8,
                       decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(4)),
                     ),
@@ -225,9 +278,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStatItem(wordsLearned.toString(), 'Слов\nизучено'),
+                  _buildStatItem(_wordsLearned.toString(), 'Слов\nизучено'),
                   _buildStatItem(streak.toString(), 'Дней\nподряд'),
-                  _buildStatItem(lessonsCompleted.toString(), 'Уроков\nпройдено'),
+                  _buildStatItem(_lessonsCompleted.toString(), 'Уроков\nпройдено'),
                 ],
               ),
               const SizedBox(height: 32),
@@ -247,13 +300,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildListTile('Настройки', Icons.settings_outlined, onTap: () async {
                 await context.push('/settings');
                 _loadProfile();
-                // ИСПРАВЛЕНО: Трубим на весь апп, что настройки (например, имя) поменялись
                 ProfileScreen.refreshNotifier.value++;
               }),
               _buildListTile('Ежедневная цель', Icons.flag_outlined, trailingText: '${_profile?['daily_time_target'] ?? '15'} мин/день'),
               const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(color: Color(0xFFEEEEEE))),
               _buildListTile('Выйти из аккаунта', Icons.logout, color: Colors.black, onTap: _signOut),
-              _buildListTile('Удалить аккаунт', Icons.delete_outline, color: Colors.red),
+              _buildListTile('Удалить аккаунт', Icons.delete_outline, color: Colors.red, onTap: _deleteAccount),
             ],
           ),
         ),
@@ -300,7 +352,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 12),
             Text(article['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Poppins')),
-            const Text('Разделение и объединение страны', style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Poppins')),
+            Text(article['category'] ?? 'Культура', style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Poppins')),
           ],
         ),
       ),

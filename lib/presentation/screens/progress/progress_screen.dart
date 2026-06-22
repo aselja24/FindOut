@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../profile/profile_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
-  final String? currentLevel; // передаём из HomeScreen напрямую
+  final String? currentLevel;
 
   const ProgressScreen({super.key, this.currentLevel});
 
@@ -16,20 +17,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   bool _isLoading = true;
 
-  // Статистика
-  int _wordsLearned = 0;         // кол-во папок с карточками
-  int _lessonsCompleted = 0;     // уникальные course_lesson
-  int _allActivities = 0;        // все записи прогресса
+  // Статистика (согласовано с ProfileScreen)
+  int _wordsLearned = 0;         
+  int _lessonsCompleted = 0;     
+  int _allActivities = 0;        
   int _streakDays = 0;
   String _currentLevel = 'A1';
-  int _courseLessonsCompleted = 0;
   int _totalLessonsForLevel = 0;
 
-  // График: количество активностей по дням (Пн–Вс), за последние 7 дней
   final List<int> _weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
   final List<bool> _weeklyStreak = [false, false, false, false, false, false, false];
 
-  // Сравнение с прошлой неделей
   int _thisWeekTotal = 0;
   int _lastWeekTotal = 0;
 
@@ -37,6 +35,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
   void initState() {
     super.initState();
     _fetchStatistics();
+    // Подписываемся на глобальный сигнал обновления
+    ProfileScreen.refreshNotifier.addListener(_fetchStatistics);
+  }
+
+  @override
+  void dispose() {
+    ProfileScreen.refreshNotifier.removeListener(_fetchStatistics);
+    super.dispose();
   }
 
   Future<void> _fetchStatistics() async {
@@ -47,115 +53,104 @@ class _ProgressScreenState extends State<ProgressScreen> {
         return;
       }
 
-      // 1. Профиль — если уровень уже передан снаружи, используем его сразу
-      try {
-        final profileData = await _supabase
-            .from('profiles')
-            .select()
-            .eq('id', user.id)
-            .maybeSingle();
-        if (profileData != null) {
-          _streakDays = profileData['streak_days'] ?? 0;
-          // Приоритет: переданный уровень из HomeScreen (уже актуальный),
-          // иначе читаем из профиля
-          _currentLevel = widget.currentLevel ?? profileData['language_level'] ?? 'A1';
-        }
-      } catch (e) {
-        debugPrint('Ошибка профиля: $e');
-        if (widget.currentLevel != null) _currentLevel = widget.currentLevel!;
+      // 1. Данные профиля
+      final profileData = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      if (profileData != null) {
+        _streakDays = profileData['streak_days'] ?? 0;
+        _currentLevel = widget.currentLevel ?? profileData['language_level'] ?? 'A1';
       }
 
+      // 2. Подсчет выученных слов
+      final modulesData = await _supabase
+          .from('flashcard_modules')
+          .select('id, flashcards(is_learned)')
+          .eq('user_id', user.id);
+
+      int learnedWordsCount = 0;
+      for (var m in modulesData) {
+        final cards = m['flashcards'] as List<dynamic>? ?? [];
+        learnedWordsCount += cards.where((c) => c['is_learned'] == true).length;
+      }
+      _wordsLearned = learnedWordsCount;
+
+      // 3. Подсчет уроков уровня
       String levelRange = 'A1-A2';
       if (_currentLevel == 'B1' || _currentLevel == 'B2') levelRange = 'B1-B2';
       if (_currentLevel == 'C1' || _currentLevel == 'C2') levelRange = 'C1-C2';
 
-      // 2. Всего уроков для уровня
-      try {
-        final data = await _supabase
-            .from('course_lessons')
-            .select('id')
-            .eq('level', levelRange);
-        _totalLessonsForLevel = data.length;
-      } catch (e) {
-        debugPrint('Ошибка уроков курса: $e');
+      final levelLessonsData = await _supabase
+          .from('course_lessons')
+          .select('id')
+          .eq('level', levelRange);
+      _totalLessonsForLevel = levelLessonsData.length;
+
+      // 4. Прогресс и активность
+      final progressData = await _supabase
+          .from('user_progress')
+          .select()
+          .eq('user_id', user.id);
+
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final thisWeekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+      final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+
+      final Set<int> uniqueCourseLessons = {};
+      _allActivities = progressData.length;
+
+      // Сбрасываем недельную статистику перед пересчетом
+      _thisWeekTotal = 0;
+      _lastWeekTotal = 0;
+      for (int i = 0; i < 7; i++) {
+        _weeklyActivity[i] = 0;
+        _weeklyStreak[i] = false;
       }
 
-      // 3. Папки с карточками (= "слова изучены" через коллекции)
-      try {
-        final foldersData = await _supabase
-            .from('flashcard_folders')
-            .select('id')
-            .eq('user_id', user.id);
-        _wordsLearned = foldersData.length;
-      } catch (e) {
-        debugPrint('Ошибка папок карточек: $e');
-      }
+      for (var p in progressData) {
+        final type = p['item_type'] as String?;
+        final itemId = (p['item_id'] as num?)?.toInt() ?? 0;
+        final score = (p['score_percentage'] ?? 0) as int;
 
-      // 4. Прогресс
-      try {
-        final progressData = await _supabase
-            .from('user_progress')
-            .select()
-            .eq('user_id', user.id);
-
-        final now = DateTime.now();
-        // Границы текущей и прошлой недели
-        final todayStart = DateTime(now.year, now.month, now.day);
-        final thisWeekStart = todayStart.subtract(Duration(days: now.weekday - 1));
-        final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
-
-        Set<int> uniqueCourseLessons = {};
-        _allActivities = progressData.length;
-
-        for (var p in progressData) {
-          final type = p['item_type'] as String?;
-          final itemId = (p['item_id'] as num?)?.toInt() ?? 0;
-
-          // Уникальные пройденные уроки курса
-          if (type == 'course_lesson') {
-            uniqueCourseLessons.add(itemId);
-          }
-
-          // Разбираем дату
-          final dateStr = p['completed_at'];
-          if (dateStr == null) continue;
-
-          DateTime completedAt;
-          try {
-            completedAt = DateTime.parse(dateStr).toLocal();
-          } catch (_) {
-            continue;
-          }
-
-          final dayStart = DateTime(completedAt.year, completedAt.month, completedAt.day);
-
-          // Текущая неделя (Пн–Вс)
-          if (!dayStart.isBefore(thisWeekStart) && dayStart.isBefore(thisWeekStart.add(const Duration(days: 7)))) {
-            final weekdayIdx = completedAt.weekday - 1; // 0=Пн, 6=Вс
-            _weeklyActivity[weekdayIdx] += 1;
-            _weeklyStreak[weekdayIdx] = true;
-            _thisWeekTotal++;
-          }
-
-          // Прошлая неделя
-          if (!dayStart.isBefore(lastWeekStart) && dayStart.isBefore(thisWeekStart)) {
-            _lastWeekTotal++;
-          }
+        if (type == 'course_lesson' && score >= 60) {
+          uniqueCourseLessons.add(itemId);
         }
 
-        _courseLessonsCompleted = uniqueCourseLessons.length;
-        // Все типы активности как "уроков пройдено"
-        _lessonsCompleted = uniqueCourseLessons.length;
+        final dateStr = p['completed_at'] ?? p['created_at'];
+        if (dateStr == null) continue;
 
-      } catch (e) {
-        debugPrint('Ошибка прогресса: $e');
+        DateTime completedAt;
+        try {
+          completedAt = DateTime.parse(dateStr).toLocal();
+        } catch (_) {
+          continue;
+        }
+
+        final dayStart = DateTime(completedAt.year, completedAt.month, completedAt.day);
+
+        if (!dayStart.isBefore(thisWeekStart) && dayStart.isBefore(thisWeekStart.add(const Duration(days: 7)))) {
+          final weekdayIdx = completedAt.weekday - 1; 
+          _weeklyActivity[weekdayIdx] += 1;
+          _weeklyStreak[weekdayIdx] = true;
+          _thisWeekTotal++;
+        }
+
+        if (!dayStart.isBefore(lastWeekStart) && dayStart.isBefore(thisWeekStart)) {
+          _lastWeekTotal++;
+        }
       }
+
+      _lessonsCompleted = uniqueCourseLessons.length;
 
       if (mounted) {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Генеральная ошибка: $e');
+      debugPrint('Error fetching stats: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -192,51 +187,56 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Текущий уровень', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
-            const SizedBox(height: 16),
-            _buildCurrentLevelCard(),
-            const SizedBox(height: 32),
-
-            const Text('Активность', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
-            const SizedBox(height: 6),
-            Text(
-              'количество занятий за каждый день этой недели',
-              style: TextStyle(fontSize: 12, color: Colors.black54, fontFamily: 'Poppins'),
-            ),
-            const SizedBox(height: 20),
-            _buildActivityChart(),
-            const SizedBox(height: 16),
-            _buildWeekComparison(),
-            const SizedBox(height: 32),
-
-            const Text('За всё время', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
-            const SizedBox(height: 16),
-            _buildAllTimeStats(),
-            const SizedBox(height: 32),
-
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text('Страйк', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    'последние 7 дней',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87.withOpacity(0.5), fontFamily: 'Poppins'),
+      body: RefreshIndicator(
+        onRefresh: _fetchStatistics,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Текущий уровень', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
+              const SizedBox(height: 16),
+              _buildCurrentLevelCard(),
+              const SizedBox(height: 32),
+        
+              const Text('Активность', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
+              const SizedBox(height: 6),
+              const Text(
+                'количество занятий за каждый день этой недели',
+                style: TextStyle(fontSize: 12, color: Colors.black54, fontFamily: 'Poppins'),
+              ),
+              const SizedBox(height: 20),
+              _buildActivityChart(),
+              const SizedBox(height: 16),
+              _buildWeekComparison(),
+              const SizedBox(height: 32),
+        
+              const Text('За всё время', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
+              const SizedBox(height: 16),
+              _buildAllTimeStats(),
+              const SizedBox(height: 32),
+        
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text('Страйк', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins')),
+                  const SizedBox(width: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      'последние 7 дней',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87.withValues(alpha: 0.5), fontFamily: 'Poppins'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildStreakCalendar(),
-            const SizedBox(height: 40),
-          ],
+                ],
+              ),
+              const SizedBox(height: 20),
+              _buildStreakCalendar(),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -244,10 +244,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Widget _buildCurrentLevelCard() {
     final nextLvl = _getNextLevel(_currentLevel);
-    int lessonsLeft = (_totalLessonsForLevel - _courseLessonsCompleted).clamp(0, 9999);
+    int lessonsLeft = (_totalLessonsForLevel - _lessonsCompleted).clamp(0, 9999);
     int percent = _totalLessonsForLevel == 0
         ? 0
-        : ((_courseLessonsCompleted / _totalLessonsForLevel) * 100).toInt().clamp(0, 100);
+        : ((_lessonsCompleted / _totalLessonsForLevel) * 100).toInt().clamp(0, 100);
     final double progressFraction = percent / 100.0;
 
     return Container(
@@ -275,7 +275,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'До уровня $nextLvl осталось $lessonsLeft уроков',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87.withOpacity(0.7), fontFamily: 'Poppins'),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87.withValues(alpha: 0.7), fontFamily: 'Poppins'),
                     ),
                   ],
                 ),
@@ -287,12 +287,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Прогресс-бар
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progressFraction,
-              backgroundColor: Colors.white.withOpacity(0.6),
+              backgroundColor: Colors.white.withValues(alpha: 0.6),
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8DB600)),
               minHeight: 8,
             ),
@@ -305,14 +304,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildActivityChart() {
     final days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     final maxVal = _weeklyActivity.fold(1, (prev, curr) => curr > prev ? curr : prev);
-    // Округляем шкалу вверх до красивого числа
     final int topLabel = maxVal;
 
     return SizedBox(
       height: 160,
       child: Stack(
         children: [
-          // Горизонтальные линии
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -323,7 +320,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
               const SizedBox(height: 20),
             ],
           ),
-          // Столбцы
           Padding(
             padding: const EdgeInsets.only(left: 30, bottom: 24, top: 4),
             child: Row(
@@ -332,7 +328,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
               children: List.generate(7, (index) {
                 final val = _weeklyActivity[index];
                 final double barHeight = maxVal == 0 ? 0 : (val / maxVal) * 110;
-                // Сегодняшний день подсвечиваем ярче
                 final todayIdx = DateTime.now().weekday - 1;
                 final isToday = index == todayIdx;
 
@@ -365,7 +360,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
               }),
             ),
           ),
-          // Подписи дней
           Positioned(
             bottom: 0, left: 30, right: 0,
             child: Row(
@@ -441,7 +435,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildAllTimeStats() {
     return Row(
       children: [
-        Expanded(child: _buildStatSquare('$_wordsLearned', 'Наборов карточек', Colors.white)),
+        Expanded(child: _buildStatSquare('$_wordsLearned', 'Слов изучено', Colors.white)),
         const SizedBox(width: 12),
         Expanded(child: _buildStatSquare('$_streakDays', 'Дней подряд', const Color(0xFFE4F9A0))),
         const SizedBox(width: 12),
@@ -458,7 +452,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: isWhite
-            ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))]
+            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))]
             : [],
       ),
       child: Column(

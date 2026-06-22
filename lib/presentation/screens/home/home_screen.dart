@@ -11,7 +11,7 @@ import '../learn/grammar/grammar_detail_screen.dart';
 import '../learn/reading/reading_detail_screen.dart';
 import '../learn/listening/listening_test_screen.dart';
 import '../learn/lessons/lesson_flow_screen.dart';
-import '../profile/profile_screen.dart'; // <-- ДОБАВЛЕН ИМПОРТ
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _currentLevel = 'A1';
   final List<String> _levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
-  // Реальный прогресс уровня
+
   double _levelProgress = 0.0;
   int _completedForLevel = 0;
   int _totalForLevel = 0;
@@ -44,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: _subTabs.length, vsync: this);
     _loadInitialData();
-    // ИСПРАВЛЕНО: Слушаем обновления (например, смена имени в настройках)
     ProfileScreen.refreshNotifier.addListener(_onRefreshNeeded);
   }
 
@@ -261,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _updateLevel(String newLevel) async {
     setState(() {
       _currentLevel = newLevel;
-      if (_profile != null) _profile!['language_level'] = newLevel; // Оптимистичное обновление
+      if (_profile != null) _profile!['language_level'] = newLevel;
       _isLoading = true;
     });
 
@@ -274,7 +273,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             .eq('id', userId);
       }
 
-      // ИСПРАВЛЕНО: Рассылаем сигнал всем остальным вкладкам!
       ProfileScreen.refreshNotifier.value++;
 
       await Future.wait([
@@ -327,22 +325,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildTopHeader() {
     final streak = _profile?['streak_days'] ?? 0;
     final avatarUrl = _profile?['avatar_url'];
+    // Берем имя из базы (проверяем разные поля, которые могут быть в таблице profiles)
+    final name = _profile?['first_name'] ?? _profile?['username'] ?? 'Привет!';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 30,
+            radius: 25,
             backgroundColor: const Color(0xFFF2F2F2),
             backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-            child: (avatarUrl == null || avatarUrl.isEmpty) ? const Icon(Icons.person_outline, size: 32, color: Color(0xFFAAAAAA)) : null,
+            child: avatarUrl == null || avatarUrl.isEmpty
+                ? const Icon(Icons.person_outline, size: 28, color: Color(0xFFAAAAAA))
+                : null,
           ),
-          const Spacer(),
-          Text('$streak', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-          const SizedBox(width: 4),
-          const Icon(Icons.local_fire_department_outlined, size: 26, color: Color(0xFFFF7B33)),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontFamily: 'Poppins',
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
