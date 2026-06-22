@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
-  // 1. Создаем глобальный сигнал для обновления
+  // Глобальный сигнал для синхронизации всех экранов
   static final ValueNotifier<int> refreshNotifier = ValueNotifier(0);
 
   const ProfileScreen({super.key});
@@ -28,25 +28,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
-    // 2. Начинаем слушать сигналы об обновлении
     ProfileScreen.refreshNotifier.addListener(_onRefreshNeeded);
   }
 
   @override
   void dispose() {
-    // 3. Отключаем слушатель при закрытии (чтобы не было утечек памяти)
     ProfileScreen.refreshNotifier.removeListener(_onRefreshNeeded);
     super.dispose();
   }
 
   void _onRefreshNeeded() {
     if (mounted) {
-      _loadProfile(); // Перезагружаем профиль, когда приходит сигнал
+      _loadProfile();
     }
   }
 
   Future<void> _loadProfile() async {
-    // ... здесь остается твой старый код загрузки (_loadProfile) ...
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
@@ -78,7 +75,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .select('culture_articles(*)')
           .eq('user_id', user.id);
 
-      // Получаем прогресс пользователя по статьям, чтобы показать проценты в избранном
       final progressData = await _supabase
           .from('user_progress')
           .select('item_id, score_percentage')
@@ -119,6 +115,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) context.go('/login');
   }
 
+  // --- ИСПРАВЛЕНО: Форматирование уровня как на макете ---
+  String _getLevelLabel(String lvl) {
+    if (lvl.contains('A1') || lvl.contains('A2')) return 'Начинающий - $lvl';
+    if (lvl.contains('B1') || lvl.contains('B2')) return 'Средний - $lvl';
+    if (lvl.contains('C1') || lvl.contains('C2')) return 'Продвинутый - $lvl';
+    return 'Начинающий - $lvl';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -126,8 +130,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final name = _profile?['first_name'] ?? 'Имя пользователя';
-    final level = _profile?['language_level'] ?? 'A1';
+    final rawLevel = _profile?['language_level'] ?? 'A1';
     final streak = _profile?['streak_days'] ?? 0;
+
+    // ИСПРАВЛЕНО: Достаем ссылку на аватар
+    final avatarUrl = _profile?['avatar_url'];
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+
     final wordsLearned = _wordsLearned;
     final lessonsCompleted = 5;
 
@@ -139,21 +148,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Профиль', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+              const Text('Профиль', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, fontFamily: 'Poppins')),
               const SizedBox(height: 24),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(_email, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                        const SizedBox(height: 4),
+                        Text(_email, style: const TextStyle(color: Colors.grey, fontSize: 14, fontFamily: 'Poppins')),
+                      ],
+                    ),
                   ),
-                  CircleAvatar(radius: 24, backgroundColor: _purple, child: const Icon(Icons.person, color: Colors.white)),
+                  // ИСПРАВЛЕНО: Теперь фото берется из базы
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: _purple,
+                    backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                    child: (avatarUrl == null || avatarUrl.isEmpty) ? Text(initial, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)) : null,
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -161,8 +178,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Начинающий - $level', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const Text('28%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text(_getLevelLabel(rawLevel), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                  const Text('28%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                 ],
               ),
               const SizedBox(height: 8),
@@ -188,14 +205,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(color: _purple, shape: BoxShape.circle),
-                      child: const Center(child: Text('DE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                      child: const Center(child: Text('DE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))),
                     ),
                     const SizedBox(width: 16),
                     const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Немецкий', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('язык изучения', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text('Немецкий', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Poppins')),
+                        Text('язык изучения', style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Poppins')),
                       ],
                     )
                   ],
@@ -203,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              const Text('Статистика', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Статистика', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -215,22 +232,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Блок Избранных статей
-              const Text('Избранные статьи', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Избранные статьи', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
               const SizedBox(height: 16),
               if (_favoriteArticles.isEmpty)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 16.0),
-                  child: Text('У вас пока нет избранных статей.', style: TextStyle(color: Colors.grey)),
+                  child: Text('У вас пока нет избранных статей.', style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
                 )
               else
-                ..._favoriteArticles.map((article) => _buildFavoriteArticleCard(article)).toList(),
+                ..._favoriteArticles.map((article) => _buildFavoriteArticleCard(article)),
 
               const SizedBox(height: 16),
 
               _buildListTile('Настройки', Icons.settings_outlined, onTap: () async {
                 await context.push('/settings');
                 _loadProfile();
+                // ИСПРАВЛЕНО: Трубим на весь апп, что настройки (например, имя) поменялись
+                ProfileScreen.refreshNotifier.value++;
               }),
               _buildListTile('Ежедневная цель', Icons.flag_outlined, trailingText: '${_profile?['daily_time_target'] ?? '15'} мин/день'),
               const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(color: Color(0xFFEEEEEE))),
@@ -246,21 +264,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+        Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, fontFamily: 'Poppins')),
         const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Poppins')),
       ],
     );
   }
 
-  // Виджет карточки для избранных
   Widget _buildFavoriteArticleCard(Map<String, dynamic> article) {
     final percent = article['progress_percent'] ?? 0;
 
     return GestureDetector(
       onTap: () async {
         await context.push('/reading/detail', extra: article);
-        _loadProfile(); // Обновляем профиль при возврате (мог поменяться процент или убрали лайк)
+        _loadProfile();
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -274,16 +291,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             Row(
               children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(12)), child: Text(article['level_restriction'] ?? 'A1', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(12)), child: Text(article['level_restriction'] ?? 'A1', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))),
                 const SizedBox(width: 8),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFFF9DE6), borderRadius: BorderRadius.circular(12)), child: Text(article['category'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFFF9DE6), borderRadius: BorderRadius.circular(12)), child: Text(article['category'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))),
                 const Spacer(),
-                Text('$percent%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                Text('$percent%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Poppins')),
               ],
             ),
             const SizedBox(height: 12),
-            Text(article['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Text('Разделение и объединение страны', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(article['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Poppins')),
+            const Text('Разделение и объединение страны', style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Poppins')),
           ],
         ),
       ),
@@ -294,9 +311,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: color),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: color, fontFamily: 'Poppins')),
       trailing: trailingText != null
-          ? Text(trailingText, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
+          ? Text(trailingText, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontFamily: 'Poppins'))
           : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
     );
