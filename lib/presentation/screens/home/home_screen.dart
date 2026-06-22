@@ -7,7 +7,6 @@ import '../learn/reading/reading_screen.dart';
 import '../learn/listening/listening_screen.dart';
 import '../progress/progress_screen.dart';
 
-// Экраны для переходов из блока "Мои уроки"
 import '../learn/grammar/grammar_detail_screen.dart';
 import '../learn/reading/reading_detail_screen.dart';
 import '../learn/listening/listening_test_screen.dart';
@@ -23,19 +22,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Состояние пользователя
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _wordOfTheDay;
-
-  // ИСПРАВЛЕНО: Умный список следующих уроков
   List<Map<String, dynamic>> _nextLessons = [];
   bool _isLoading = true;
 
-  // Выбранный уровень
   String _currentLevel = 'A1';
   final List<String> _levels = ['A1', 'A2', 'B1', 'C1'];
 
-  // Управление под-страницами
   late TabController _tabController;
   final List<String> _subTabs = ['Главная', 'Карточки', 'Грамматика', 'Слушание', 'Чтение'];
 
@@ -52,7 +46,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _loadInitialData() async {
+  // ИСПРАВЛЕНО: Добавлен параметр showLoading для мгновенной реакции UI при возврате
+  Future<void> _loadInitialData({bool showLoading = false}) async {
+    if (showLoading) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
@@ -72,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
       await Future.wait([
         _loadWordOfTheDay(),
-        _loadNextLessons(), // Вызываем умную загрузку
+        _loadNextLessons(),
       ]);
     } catch (e) {
       debugPrint('Ошибка загрузки данных главной: $e');
@@ -97,13 +96,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  // --- ИСПРАВЛЕНО: Умный поиск СЛЕДУЮЩЕГО урока, который еще не пройден ---
+  String _mapLevelToRange(String level) {
+    if (level == 'A1' || level == 'A2') return 'A1-A2';
+    if (level == 'B1' || level == 'B2') return 'B1-B2';
+    if (level == 'C1' || level == 'C2') return 'C1-C2';
+    return 'A1-A2';
+  }
+
   Future<void> _loadNextLessons() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // 1. Получаем ВЕСЬ прогресс пользователя, чтобы знать, что уже изучено
       final progressData = await _supabase.from('user_progress').select().eq('user_id', userId);
 
       Set<int> completedGrammar = {};
@@ -111,17 +115,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       Set<int> completedReading = {};
       Set<int> completedCourse = {};
 
-      Map<String, int> partialProgress = {}; // Для кольца прогресса
+      Map<String, int> partialProgress = {};
 
       for (var p in progressData) {
         final type = p['item_type'] as String;
-        final id = p['item_id'] as int;
-        final score = p['score_percentage'] ?? 0;
+        final id = (p['item_id'] as num).toInt();
+        final score = (p['score_percentage'] as num?)?.toInt() ?? 0;
 
         partialProgress['${type}_$id'] = score;
 
-        // Если сдали на 100, считаем урок полностью пройденным
-        if (score == 100) {
+        if (score >= 60) {
           if (type == 'grammar_lesson') completedGrammar.add(id);
           if (type == 'listening_test') completedListening.add(id);
           if (type == 'culture_article' || type == 'reading_test') completedReading.add(id);
@@ -130,91 +133,139 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       }
 
       List<Map<String, dynamic>> nextLessons = [];
+      final levelRange = _mapLevelToRange(_currentLevel);
 
-      // 2. Ищем первый не пройденный урок ГРАММАТИКИ
-      final grammarData = await _supabase.from('grammar_lessons').select().order('id');
-      final nextGrammar = grammarData.where((g) => !completedGrammar.contains(g['id'])).firstOrNull 
-          ?? (grammarData.isNotEmpty ? grammarData.last : null);
-      
-      if (nextGrammar != null) {
-        final gId = nextGrammar['id'];
+      // Грамматика
+      final grammarData = await _supabase.from('grammar_lessons').select().eq('level', levelRange).order('id');
+      final nextGrammar = grammarData.firstWhere(
+              (g) => !completedGrammar.contains((g['id'] as num).toInt()),
+          orElse: () => {'id': -1}
+      );
+      if (nextGrammar['id'] != -1) {
         nextLessons.add({
           'type': 'grammar',
           'title': 'Грамматика',
           'subtitle': nextGrammar['title'] ?? '',
           'index': grammarData.indexOf(nextGrammar) + 1,
-          'progress': partialProgress['grammar_lesson_$gId'] ?? 0,
+          'progress': partialProgress['grammar_lesson_${nextGrammar['id']}'] ?? 0,
           'mainColor': const Color(0xFF7B4DFE),
           'bgColor': const Color(0xFFBCA6F6),
           'icon': Icons.book_rounded,
           'raw_data': nextGrammar,
         });
+      } else if (grammarData.isNotEmpty) {
+        nextLessons.add({
+          'type': 'grammar',
+          'title': 'Грамматика',
+          'subtitle': 'Все уроки пройдены! 🎉',
+          'index': grammarData.length,
+          'progress': 100,
+          'mainColor': const Color(0xFF7B4DFE),
+          'bgColor': const Color(0xFFBCA6F6),
+          'icon': Icons.book_rounded,
+          'raw_data': grammarData.last,
+        });
       }
 
-      // 3. Ищем первый не пройденный урок СЛУШАНИЯ
-      final listeningData = await _supabase.from('listening_tests').select().order('id');
-      final nextListening = listeningData.where((l) => !completedListening.contains(l['id'])).firstOrNull 
-          ?? (listeningData.isNotEmpty ? listeningData.last : null);
-      
-      if (nextListening != null) {
-        final lId = nextListening['id'];
+      // Слушание
+      final listeningData = await _supabase.from('listening_tests').select().eq('level', levelRange).order('id');
+      final nextListening = listeningData.firstWhere(
+              (l) => !completedListening.contains((l['id'] as num).toInt()),
+          orElse: () => {'id': -1}
+      );
+      if (nextListening['id'] != -1) {
         nextLessons.add({
           'type': 'listening',
           'title': 'Слушание',
           'subtitle': nextListening['title'] ?? '',
           'index': listeningData.indexOf(nextListening) + 1,
-          'progress': partialProgress['listening_test_$lId'] ?? 0,
+          'progress': partialProgress['listening_test_${nextListening['id']}'] ?? 0,
           'mainColor': const Color(0xFF8DB600),
           'bgColor': const Color(0xFFE4F9A0),
           'icon': Icons.headphones_rounded,
           'raw_data': nextListening,
         });
+      } else if (listeningData.isNotEmpty) {
+        nextLessons.add({
+          'type': 'listening',
+          'title': 'Слушание',
+          'subtitle': 'Все тесты пройдены! 🎉',
+          'index': listeningData.length,
+          'progress': 100,
+          'mainColor': const Color(0xFF8DB600),
+          'bgColor': const Color(0xFFE4F9A0),
+          'icon': Icons.headphones_rounded,
+          'raw_data': listeningData.last,
+        });
       }
 
-      // 4. Ищем первый не пройденный урок ЧТЕНИЯ
-      final readingData = await _supabase.from('culture_articles').select().order('id');
-      final nextReading = readingData.where((r) => !completedReading.contains(r['id'])).firstOrNull 
-          ?? (readingData.isNotEmpty ? readingData.last : null);
-      
-      if (nextReading != null) {
-        final rId = nextReading['id'];
+      // Чтение
+      List<String> readingLevels = levelRange == 'A1-A2' ? ['A1', 'A2', 'A1-A2'] : [levelRange];
+      final readingData = await _supabase.from('culture_articles').select().inFilter('level_restriction', readingLevels).order('id');
+      final nextReading = readingData.firstWhere(
+              (r) => !completedReading.contains((r['id'] as num).toInt()),
+          orElse: () => {'id': -1}
+      );
+      if (nextReading['id'] != -1) {
         nextLessons.add({
           'type': 'reading',
           'title': 'Чтение',
           'subtitle': nextReading['title'] ?? '',
           'index': readingData.indexOf(nextReading) + 1,
-          'progress': partialProgress['reading_test_$rId'] ?? partialProgress['culture_article_$rId'] ?? 0,
+          'progress': partialProgress['reading_test_${nextReading['id']}'] ?? partialProgress['culture_article_${nextReading['id']}'] ?? 0,
           'mainColor': const Color(0xFFCA4B24),
           'bgColor': const Color(0xFFF6B282),
           'icon': Icons.menu_book_rounded,
           'raw_data': nextReading,
         });
+      } else if (readingData.isNotEmpty) {
+        nextLessons.add({
+          'type': 'reading',
+          'title': 'Чтение',
+          'subtitle': 'Все статьи пройдены! 🎉',
+          'index': readingData.length,
+          'progress': 100,
+          'mainColor': const Color(0xFFCA4B24),
+          'bgColor': const Color(0xFFF6B282),
+          'icon': Icons.menu_book_rounded,
+          'raw_data': readingData.last,
+        });
       }
 
-      // 5. Ищем первый не пройденный КОМПЛЕКСНЫЙ УРОК
-      final courseData = await _supabase.from('course_lessons').select().order('order_num');
-      final nextCourse = courseData.where((c) => !completedCourse.contains(c['id'])).firstOrNull 
-          ?? (courseData.isNotEmpty ? courseData.last : null);
-      
-      if (nextCourse != null) {
-        final cId = nextCourse['id'];
+      // Комплексный урок
+      final courseData = await _supabase.from('course_lessons').select().eq('level', levelRange).order('order_num');
+      final nextCourse = courseData.firstWhere(
+              (c) => !completedCourse.contains((c['id'] as num).toInt()),
+          orElse: () => {'id': -1}
+      );
+      if (nextCourse['id'] != -1) {
         nextLessons.add({
           'type': 'course',
           'title': 'Комплексный урок',
           'subtitle': nextCourse['title'] ?? '',
           'index': nextCourse['order_num'] ?? (courseData.indexOf(nextCourse) + 1),
-          'progress': partialProgress['course_lesson_$cId'] ?? 0,
+          'progress': partialProgress['course_lesson_${nextCourse['id']}'] ?? 0,
           'mainColor': const Color(0xFFD1339B),
           'bgColor': const Color(0xFFF4ADD6),
           'icon': Icons.school_rounded,
           'raw_data': nextCourse,
         });
+      } else if (courseData.isNotEmpty) {
+        nextLessons.add({
+          'type': 'course',
+          'title': 'Комплексный урок',
+          'subtitle': 'Курс завершен!',
+          'index': courseData.length,
+          'progress': 100,
+          'mainColor': const Color(0xFFD1339B),
+          'bgColor': const Color(0xFFF4ADD6),
+          'icon': Icons.school_rounded,
+          'raw_data': courseData.last,
+        });
       }
 
       if (mounted) {
-        setState(() {
-          _nextLessons = nextLessons;
-        });
+        setState(() => _nextLessons = nextLessons);
       }
     } catch (e) {
       debugPrint('Ошибка загрузки следующих уроков: $e');
@@ -269,9 +320,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 children: [
                   _buildMainTabContent(),
                   FlashcardsTab(currentLevel: _currentLevel),
-                  const GrammarScreen(),
-                  const ListeningScreen(),
-                  const ReadingScreen(),
+                  GrammarScreen(currentLevel: _currentLevel),
+                  ListeningScreen(currentLevel: _currentLevel),
+                  ReadingScreen(currentLevel: _currentLevel),
                 ],
               ),
             ),
@@ -293,21 +344,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             radius: 30,
             backgroundColor: const Color(0xFFF2F2F2),
             backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-            child: avatarUrl == null || avatarUrl.isEmpty
-                ? const Icon(Icons.person_outline, size: 32, color: Color(0xFFAAAAAA))
-                : null,
+            child: avatarUrl == null || avatarUrl.isEmpty ? const Icon(Icons.person_outline, size: 32, color: Color(0xFFAAAAAA)) : null,
           ),
           const Spacer(),
-          Text(
-            '$streak',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins'),
-          ),
+          Text('$streak', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
           const SizedBox(width: 4),
-          const Icon(
-            Icons.local_fire_department_outlined,
-            size: 26,
-            color: Color(0xFFFF7B33),
-          ),
+          const Icon(Icons.local_fire_department_outlined, size: 26, color: Color(0xFFFF7B33)),
           const SizedBox(width: 8),
         ],
       ),
@@ -352,12 +394,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(height: 6),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Прогресс этапа', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
-            ],
-          ),
+          const Text('Прогресс этапа', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
         ],
       ),
     );
@@ -444,7 +481,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- ИСПРАВЛЕНО: Дизайн карточки точь-в-точь как на макете ---
   Widget _buildNextLessonCard(Map<String, dynamic> item) {
     final type = item['type'] as String;
     final title = item['title'] as String;
@@ -455,38 +491,36 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final Color bgColor = item['bgColor'];
     final IconData icon = item['icon'];
 
-    // Заполнение круга (от 0.0 до 1.0) в зависимости от частичного прогресса
     final double fillValue = progress == 0 ? 0.0 : progress / 100.0;
 
     return GestureDetector(
       onTap: () {
-        // Переход на нужный экран в зависимости от типа урока
         final rawData = item['raw_data'];
+
+        // ИСПРАВЛЕНО: Теперь при возврате включается загрузка (showLoading: true)
         if (type == 'grammar') {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => GrammarDetailScreen(lesson: rawData))).then((_) => _loadInitialData());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => GrammarDetailScreen(lesson: rawData)))
+              .then((_) => _loadInitialData(showLoading: true));
         } else if (type == 'reading') {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ReadingDetailScreen(article: rawData))).then((_) => _loadInitialData());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ReadingDetailScreen(article: rawData)))
+              .then((_) => _loadInitialData(showLoading: true));
         } else if (type == 'listening') {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ListeningTestScreen(testData: rawData))).then((_) => _loadInitialData());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ListeningTestScreen(testData: rawData)))
+              .then((_) => _loadInitialData(showLoading: true));
         } else if (type == 'course') {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => LessonFlowScreen(lessonData: rawData))).then((_) => _loadInitialData());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => LessonFlowScreen(lessonData: rawData)))
+              .then((_) => _loadInitialData(showLoading: true));
         }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
         child: Row(
           children: [
             Container(
               width: 54, height: 54,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
               child: Icon(icon, color: mainColor, size: 28),
             ),
             const SizedBox(width: 16),
@@ -506,26 +540,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Белый фон кольца
-                  CircularProgressIndicator(
-                    value: 1.0,
-                    strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.6)),
-                  ),
-                  // Цветное заполнение кольца (если урок начат, но не закончен)
-                  CircularProgressIndicator(
-                    value: fillValue,
-                    strokeWidth: 4,
-                    backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation<Color>(mainColor),
-                  ),
-                  // Номер урока в центре
-                  Center(
-                    child: Text(
-                      '$index',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins'),
-                    ),
-                  ),
+                  CircularProgressIndicator(value: 1.0, strokeWidth: 4, valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.6))),
+                  CircularProgressIndicator(value: fillValue, strokeWidth: 4, backgroundColor: Colors.transparent, valueColor: AlwaysStoppedAnimation<Color>(mainColor)),
+                  Center(child: Text('$index', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87, fontFamily: 'Poppins'))),
                 ],
               ),
             ),
@@ -544,10 +561,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFBAA1F6),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFBAA1F6), borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -556,14 +570,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Слово дня',
-                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
-                ),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: const Text('Слово дня', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
               ),
               const Icon(Icons.volume_up_rounded, color: Colors.white, size: 22),
             ],
@@ -583,54 +591,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildMenuBlock({
-    required String title,
-    required String subtitle,
-    required Color color,
-    required bool isDarkTheme,
-    required String imageAsset,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildMenuBlock({required String title, required String subtitle, required Color color, required bool isDarkTheme, required String imageAsset, required VoidCallback onTap}) {
     final textColor = isDarkTheme ? Colors.white : AppColors.textPrimary;
     final subTextColor = isDarkTheme ? Colors.white.withValues(alpha: 0.8) : AppColors.textSecondary;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: double.infinity,
-        height: 115,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        width: double.infinity, height: 115,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
         child: Stack(
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(title, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
                   const SizedBox(height: 4),
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.5,
-                    child: Text(subtitle, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins', height: 1.2)),
-                  ),
+                  SizedBox(width: MediaQuery.of(context).size.width * 0.5, child: Text(subtitle, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Poppins', height: 1.2))),
                 ],
               ),
             ),
-            Positioned(
-              right: 8,
-              bottom: 0,
-              top: 0,
-              child: Image.asset(
-                imageAsset,
-                width: 105,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const SizedBox(),
-              ),
-            ),
+            Positioned(right: 8, bottom: 0, top: 0, child: Image.asset(imageAsset, width: 105, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox())),
           ],
         ),
       ),

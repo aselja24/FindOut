@@ -5,7 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../profile/profile_screen.dart';
 
 class ReadingScreen extends StatefulWidget {
-  const ReadingScreen({super.key});
+  final String? currentLevel;
+  const ReadingScreen({super.key, this.currentLevel});
 
   @override
   State<ReadingScreen> createState() => _ReadingScreenState();
@@ -19,17 +20,35 @@ class _ReadingScreenState extends State<ReadingScreen> {
   final List<String> _categories = ['Все', 'Культура', 'Места', 'Традиции', 'История', 'Кухня'];
   String _selectedCategory = 'Все';
 
-  // --- ДОБАВЛЕНО: Переменные для фильтра уровней ---
   String _selectedLevel = 'A1-A2';
   final List<String> _levels = ['A1-A2', 'B1-B2', 'C1-C2'];
 
   @override
   void initState() {
     super.initState();
+    if (widget.currentLevel != null) {
+      _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+    }
     _fetchArticlesAndProgress();
   }
 
-  // --- ДОБАВЛЕНО: Динамический цвет для кнопок уровней ---
+  @override
+  void didUpdateWidget(ReadingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentLevel != oldWidget.currentLevel && widget.currentLevel != null) {
+      setState(() {
+        _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+      });
+    }
+  }
+
+  String _mapLevelToRange(String level) {
+    if (level == 'A1' || level == 'A2') return 'A1-A2';
+    if (level == 'B1' || level == 'B2') return 'B1-B2';
+    if (level == 'C1' || level == 'C2') return 'C1-C2';
+    return 'A1-A2';
+  }
+
   Color _getLevelColor(String level) {
     if (level.contains('A1') || level.contains('A2')) return const Color(0xFFC3F336);
     if (level.contains('B1') || level.contains('B2')) return const Color(0xFFFF9DE6);
@@ -42,7 +61,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       setState(() => _isLoading = true);
       final user = _supabase.auth.currentUser;
 
-      // 1. Формируем запрос на статьи
       var query = _supabase.from('culture_articles').select();
       if (_selectedCategory != 'Все') {
         query = query.eq('category', _selectedCategory);
@@ -53,7 +71,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       List<int> favoriteIds = [];
 
       if (user != null) {
-        // 2. Получаем прогресс
         final pData = await _supabase
             .from('user_progress')
             .select('item_id, score_percentage')
@@ -61,7 +78,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
             .eq('item_type', 'reading_test');
         progressData = List<Map<String, dynamic>>.from(pData);
 
-        // 3. Получаем список избранного
         final favData = await _supabase
             .from('favorite_articles')
             .select('article_id')
@@ -69,7 +85,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
         favoriteIds = favData.map((f) => f['article_id'] as int).toList();
       }
 
-      // 4. Объединяем данные
       final List<Map<String, dynamic>> mergedArticles = [];
       for (var article in articlesData) {
         final articleId = article['id'];
@@ -83,7 +98,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
         mergedArticles.add({
           ...article,
           'progress_percent': percent,
-          'is_favorite': favoriteIds.contains(articleId), // Флаг лайка
+          'is_favorite': favoriteIds.contains(articleId),
         });
       }
 
@@ -97,12 +112,10 @@ class _ReadingScreenState extends State<ReadingScreen> {
     }
   }
 
-  // Функция добавления/удаления из избранного
   Future<void> _toggleFavorite(int articleId, bool isCurrentlyFavorite) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
-    // Мгновенное обновление UI (оптимистичный подход)
     setState(() {
       final index = _articles.indexWhere((a) => a['id'] == articleId);
       if (index != -1) {
@@ -112,26 +125,20 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
     try {
       if (isCurrentlyFavorite) {
-        // Удаляем лайк
         await _supabase
             .from('favorite_articles')
             .delete()
             .eq('user_id', user.id)
             .eq('article_id', articleId);
       } else {
-        // Ставим лайк
         await _supabase.from('favorite_articles').insert({
           'user_id': user.id,
           'article_id': articleId,
         });
       }
-
-      // ОТПРАВЛЯЕМ СИГНАЛ ПРОФИЛЮ ОБНОВИТЬСЯ:
       ProfileScreen.refreshNotifier.value++;
-
     } catch (e) {
       debugPrint('Ошибка избранного: $e');
-      // В случае ошибки возвращаем как было
       setState(() {
         final index = _articles.indexWhere((a) => a['id'] == articleId);
         if (index != -1) {
@@ -143,7 +150,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // --- ДОБАВЛЕНО: Локальная фильтрация статей по выбранному уровню ---
     final filteredArticles = _articles.where((article) {
       final String lvl = article['level_restriction'] ?? '';
       if (_selectedLevel == 'A1-A2') return lvl == 'A1' || lvl == 'A2' || lvl == 'A1-A2';
@@ -170,25 +176,21 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _selectedCategory == cat ? const Color(0xFFFF9D66) : const Color(0xFFFF9D66).withOpacity(0.5),
+                      color: _selectedCategory == cat ? const Color(0xFFFF9D66) : const Color(0xFFFF9D66).withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(cat, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
                   ),
                 ),
               )),
-
-              // --- ИСПРАВЛЕНО: Теперь здесь рабочий выпадающий список (как в аудировании) ---
               _buildLevelFilter(),
             ],
           ),
         ),
-
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Text('Продолжить чтение', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         ),
-
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -196,7 +198,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ? const Center(child: Text('Для этого уровня пока нет статей', style: TextStyle(fontFamily: 'Poppins')))
               : ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: filteredArticles.length, // Используем отфильтрованный список
+            itemCount: filteredArticles.length,
             itemBuilder: (context, index) {
               final article = filteredArticles[index];
               return _buildArticleCard(article);
@@ -207,7 +209,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  // --- ДОБАВЛЕНО: Виджет выпадающего списка уровней ---
   Widget _buildLevelFilter() {
     return PopupMenuButton<String>(
       initialValue: _selectedLevel,
@@ -287,7 +288,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             const SizedBox(height: 16),
             Text(article['title'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)), // Если захочешь сделать динамичным, замени на article['subtitle'] если он есть в БД
+            const Text('Разделение и объединение страны', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 16),
             Row(
               children: [

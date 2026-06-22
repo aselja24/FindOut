@@ -4,7 +4,8 @@ import '../../../../core/theme/app_colors.dart';
 import 'listening_test_screen.dart';
 
 class ListeningScreen extends StatefulWidget {
-  const ListeningScreen({super.key});
+  final String? currentLevel;
+  const ListeningScreen({super.key, this.currentLevel});
 
   @override
   State<ListeningScreen> createState() => _ListeningScreenState();
@@ -21,7 +22,27 @@ class _ListeningScreenState extends State<ListeningScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.currentLevel != null) {
+      _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+    }
     _fetchTests();
+  }
+
+  @override
+  void didUpdateWidget(ListeningScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentLevel != oldWidget.currentLevel && widget.currentLevel != null) {
+      setState(() {
+        _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+      });
+    }
+  }
+
+  String _mapLevelToRange(String level) {
+    if (level == 'A1' || level == 'A2') return 'A1-A2';
+    if (level == 'B1' || level == 'B2') return 'B1-B2';
+    if (level == 'C1' || level == 'C2') return 'C1-C2';
+    return 'A1-A2';
   }
 
   // Функция для динамического определения цвета уровня

@@ -5,17 +5,22 @@ import 'reading_test_screen.dart';
 
 class ReadingDetailScreen extends StatelessWidget {
   final Map<String, dynamic> article;
-  final bool isFromLessonFlow; // <-- ДОБАВЛЕН ФЛАГ
+  final bool isFromLessonFlow;
 
   const ReadingDetailScreen({
     super.key,
     required this.article,
-    this.isFromLessonFlow = false, // По умолчанию false
+    this.isFromLessonFlow = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final vocabList = article['vocabulary'] as List<dynamic>? ?? [];
+    final title = article['title'] ?? 'Статья';
+    final contentRu = article['content_ru'] ?? '';
+    final contentDe = article['content_de'] ?? ''; // Возвращаем немецкий текст
+    final level = article['level_restriction'] ?? 'A1';
+    final category = article['category'] ?? 'Культура';
+    final vocabList = article['vocabulary'] as List<dynamic>? ?? []; // Возвращаем словарь
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -26,101 +31,126 @@ class ReadingDetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
           onPressed: () => context.pop(),
         ),
-        title: Text(
-          article['title'],
-          style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 8, top: 14, bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(color: const Color(0xFFDBF494), borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text(article['level_restriction'] ?? 'A1-A2', style: const TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold))),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 14, bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(color: const Color(0xFFFF9DE6), borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text(article['category'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold))),
+            margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: Text(
+                level,
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
           ),
         ],
       ),
       body: Column(
         children: [
-          Container(height: 4, width: double.infinity, color: const Color(0xFFFF9D66)),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(article['content_ru'] ?? '', style: const TextStyle(fontSize: 14, color: Color(0xFF333333), height: 1.5)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Divider(color: Color(0xFFEEEEEE), thickness: 1),
-                  ),
-                  Text(article['content_de'] ?? '', style: const TextStyle(fontSize: 14, color: Color(0xFF333333), height: 1.5)),
-
-                  const SizedBox(height: 40),
-                  const Text('Слова и выражения', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Container(height: 4, width: 140, color: const Color(0xFFFF9D66), margin: const EdgeInsets.only(top: 4, bottom: 16)),
-
-                  ...vocabList.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text.rich(
-                        TextSpan(
-                            text: '${item['word']} - ',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            children: [
-                              TextSpan(text: item['translation'], style: const TextStyle(fontWeight: FontWeight.normal)),
-                            ]
-                        )
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  )),
+                    child: Text(
+                      category,
+                      style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF2D2D2D), fontFamily: 'Poppins', height: 1.2),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Вывод русского текста
+                  if (contentRu.isNotEmpty) ...[
+                    Text(
+                      contentRu,
+                      style: const TextStyle(fontSize: 15, height: 1.7, color: Color(0xFF444444), fontFamily: 'Poppins'),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Divider(color: Color(0xFFEEEEEE), thickness: 1),
+                    ),
+                  ],
+
+                  // Вывод немецкого текста
+                  if (contentDe.isNotEmpty) ...[
+                    Text(
+                      contentDe,
+                      style: const TextStyle(fontSize: 15, height: 1.7, color: Color(0xFF444444), fontFamily: 'Poppins'),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+
+                  // Вывод словаря
+                  if (vocabList.isNotEmpty) ...[
+                    const Text('Слова и выражения', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, fontFamily: 'Poppins', color: Colors.black87)),
+                    Container(height: 4, width: 80, color: const Color(0xFFFF9D66), margin: const EdgeInsets.only(top: 8, bottom: 20)),
+
+                    ...vocabList.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text.rich(
+                          TextSpan(
+                              text: '${item['word']} - ',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, fontFamily: 'Poppins', color: Colors.black87),
+                              children: [
+                                TextSpan(text: item['translation'], style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black54)),
+                              ]
+                          )
+                      ),
+                    )),
+                  ],
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(24.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // ИСПРАВЛЕНО: Умная проверка пути
-                      if (isFromLessonFlow) {
+            child: SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () {
+                  final int articleId = (article['id'] as num).toInt();
+
+                  if (isFromLessonFlow) {
+                    Navigator.pop(context, true);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ReadingTestScreen(articleId: articleId)),
+                    ).then((result) {
+                      if (context.mounted && result == true) {
                         Navigator.pop(context, true);
-                      } else {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => ReadingTestScreen(articleId: article['id'])),
-                        );
                       }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7B4DFE),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Тест по статье', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  elevation: 0,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC3F336),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Добавить всё в карточки', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center),
-                  ),
+                child: const Text(
+                  'Перейти к тесту',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
                 ),
-              ],
+              ),
             ),
           ),
         ],

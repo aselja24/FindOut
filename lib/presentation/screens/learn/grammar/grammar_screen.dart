@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class GrammarScreen extends StatefulWidget {
-  const GrammarScreen({super.key});
+  final String? currentLevel;
+  const GrammarScreen({super.key, this.currentLevel});
 
   @override
   State<GrammarScreen> createState() => _GrammarScreenState();
@@ -14,8 +15,8 @@ class _GrammarScreenState extends State<GrammarScreen> {
   final _supabase = Supabase.instance.client;
   final TextEditingController _searchCtrl = TextEditingController();
 
-  List<Map<String, dynamic>> _allLessons = []; // Храним вообще ВСЕ уроки из базы
-  List<Map<String, dynamic>> _filteredLessons = []; // То, что показываем сейчас
+  List<Map<String, dynamic>> _allLessons = [];
+  List<Map<String, dynamic>> _filteredLessons = [];
   bool _isLoading = true;
 
   String _selectedLevel = 'A1-A2';
@@ -31,28 +32,42 @@ class _GrammarScreenState extends State<GrammarScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchAllLessons(); // Загружаем все уровни разом
+    if (widget.currentLevel != null) {
+      _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+    }
+    _fetchAllLessons();
     _searchCtrl.addListener(_filterLessons);
   }
 
   @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
+  void didUpdateWidget(GrammarScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentLevel != oldWidget.currentLevel && widget.currentLevel != null) {
+      setState(() {
+        _selectedLevel = _mapLevelToRange(widget.currentLevel!);
+        _filterLessons();
+      });
+    }
   }
 
-  // Загружаем ВСЕ уроки один раз
+  String _mapLevelToRange(String level) {
+    if (level == 'A1' || level == 'A2') return 'A1-A2';
+    if (level == 'B1' || level == 'B2') return 'B1-B2';
+    if (level == 'C1' || level == 'C2') return 'C1-C2';
+    return 'A1-A2';
+  }
+
   Future<void> _fetchAllLessons() async {
     try {
       setState(() => _isLoading = true);
       final data = await _supabase
           .from('grammar_lessons')
           .select()
-          .order('created_at'); // Убрали фильтр .eq('level'), качаем всё
+          .order('created_at');
 
       setState(() {
         _allLessons = List<Map<String, dynamic>>.from(data);
-        _filterLessons(); // Сразу применяем фильтры
+        _filterLessons();
         _isLoading = false;
       });
     } catch (e) {
@@ -61,15 +76,12 @@ class _GrammarScreenState extends State<GrammarScreen> {
     }
   }
 
-  // Локальная фильтрация: либо по уровню, либо глобальный поиск
   void _filterLessons() {
     final query = _searchCtrl.text.toLowerCase().trim();
     setState(() {
       if (query.isEmpty) {
-        // Если поиска нет, показываем только выбранный уровень
         _filteredLessons = _allLessons.where((lesson) => lesson['level'] == _selectedLevel).toList();
       } else {
-        // Если человек ищет, ищем ВЕЗДЕ (игнорируем выбранный уровень)
         _filteredLessons = _allLessons.where((lesson) {
           final title = lesson['title'].toString().toLowerCase();
           return title.contains(query);
@@ -91,7 +103,6 @@ class _GrammarScreenState extends State<GrammarScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 1. Поисковик
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Container(
@@ -122,8 +133,6 @@ class _GrammarScreenState extends State<GrammarScreen> {
             ),
           ),
         ),
-
-        // 2. Выбор уровня
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -138,11 +147,10 @@ class _GrammarScreenState extends State<GrammarScreen> {
                 onSelected: (String level) {
                   setState(() {
                     _selectedLevel = level;
-                    // Если человек переключил уровень, очищаем поиск, чтобы показать уроки уровня
                     if (_searchCtrl.text.isNotEmpty) {
                       _searchCtrl.clear();
                     }
-                    _filterLessons(); // Фильтруем локально (БЕЗ запроса в БД)
+                    _filterLessons();
                   });
                 },
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -176,8 +184,6 @@ class _GrammarScreenState extends State<GrammarScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // 3. Список уроков
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -206,17 +212,16 @@ class _GrammarScreenState extends State<GrammarScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.5),
+                    color: color.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Выводим уровень темы
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

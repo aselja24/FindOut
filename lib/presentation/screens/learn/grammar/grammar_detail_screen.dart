@@ -5,12 +5,12 @@ import 'grammar_test_screen.dart';
 
 class GrammarDetailScreen extends StatelessWidget {
   final Map<String, dynamic> lesson;
-  final bool isFromLessonFlow; // <-- ДОБАВЛЕН ФЛАГ
+  final bool isFromLessonFlow;
 
   const GrammarDetailScreen({
     super.key,
     required this.lesson,
-    this.isFromLessonFlow = false, // По умолчанию false
+    this.isFromLessonFlow = false,
   });
 
   @override
@@ -56,24 +56,14 @@ class GrammarDetailScreen extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF2D2D2D),
-                      fontFamily: 'Poppins',
-                    ),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF2D2D2D), fontFamily: 'Poppins'),
                   ),
                   const SizedBox(height: 8),
                   const Divider(color: AppColors.primary, thickness: 2, endIndent: 250),
                   const SizedBox(height: 24),
                   Text(
                     ruleText,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.6,
-                      color: Color(0xFF555555),
-                      fontFamily: 'Poppins',
-                    ),
+                    style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF555555), fontFamily: 'Poppins'),
                   ),
                   const SizedBox(height: 24),
                   if (tablesData != null && tablesData.isNotEmpty)
@@ -90,16 +80,21 @@ class GrammarDetailScreen extends StatelessWidget {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  final int lessonId = lesson['id'] as int;
+                  final int lessonId = (lesson['id'] as num).toInt();
 
-                  // ИСПРАВЛЕНО: Умная проверка пути
                   if (isFromLessonFlow) {
-                    Navigator.pop(context, true); // Если из Урока - возвращаем сигнал
+                    Navigator.pop(context, true);
                   } else {
-                    Navigator.pushReplacement(    // Если из Библиотеки - открываем тест напрямую
+                    // ИСПРАВЛЕНО: Ждем результата теста.
+                    // Если тест пройден успешно (true), закрываем и экран теории!
+                    Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => GrammarTestScreen(lessonId: lessonId)),
-                    );
+                    ).then((result) {
+                      if (context.mounted && result == true) {
+                        Navigator.pop(context, true);
+                      }
+                    });
                   }
                 },
                 style: ElevatedButton.styleFrom(
